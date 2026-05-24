@@ -59,10 +59,43 @@
       "owner": "@huangbaixun",
       "notes": "All 14 tasks in the plan traced to this single feature (per harness-engineering subagent grounding rule). Future slices (SLICE-1 Trace E2E etc.) will get their own feature entries. See ADR-0001 §5 for the slice roadmap.",
       "slice_1_prerequisites": [
-        "Decide ClickHouse schema init mechanism (docker-entrypoint-initdb.d/ vs dedicated ch-migrate service)",
-        "Decide Query API deployment shape (extend gateway binary vs new backend/cmd/query/ service per ADR-0001 §3.2)",
-        "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests BEFORE first real CH write (ADR-0001 §3.3)"
+        "Decide ClickHouse schema init mechanism (docker-entrypoint-initdb.d/ vs dedicated ch-migrate service) — tracked as PRE-1 in claude-progress.json",
+        "Decide Query API deployment shape (extend gateway binary vs new backend/cmd/query/ service per ADR-0001 §3.2) — tracked as PRE-2",
+        "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests BEFORE first real CH write (ADR-0001 §3.3) — tracked as PRE-3"
       ]
+    },
+    {
+      "id": "SLICE-1",
+      "title": "Trace ingest 端到端 — OTel processor + Go ingester + CH traces_v1 + query API + Traces page",
+      "priority": "P0",
+      "status": "proposed",
+      "current_state": "Slice 0 stack runs; OTel Collector has only debug exporter; no CH tables; no /api/v1/traces endpoint; frontend Traces page does not exist.",
+      "target_state": "Run OTel demo (hot-r.o.d. or similar) → traces written to CH traces_v1 (tenant-scoped) → curl /api/v1/traces returns waterfall JSON → frontend /traces page renders list + detail with cross-jump to logs (Slice 2). Two tenants verified to not see each others traces (cross-tenant E2E reverse test).",
+      "acceptance_criteria": [
+        "OTel Collector custom processor (Go) reads tenant.id from OTLP resource attribute or 'X-Tenant-Id' header on HTTP receiver; rejects spans missing tenant.id with 400/dropped + metric",
+        "CH traces_v1 table created (tenant_id LowCardinality(String), trace_id, span_id, parent_span_id, service, operation, ts DateTime64(9), duration UInt64, attributes Map(String,String), status, span_kind); ORDER BY (tenant_id, service, ts) PARTITION BY (tenant_id, toYYYYMMDD(ts))",
+        "Go ingester service: receives OTLP from Collector, writes batches to CH traces_v1, propagates tenant_id from processor",
+        "Query API: GET /api/v1/traces (list with filters: service/operation/ts range/min_duration) + GET /api/v1/traces/{trace_id} (waterfall structure with all spans)",
+        "All Query API SQL goes through MustTenantScope(ctx, q) helper (PRE-3); attempting bare SQL fails a lint or build check",
+        "ClickHouse Row Policy enforces tenant_id filter at CH level (defense-in-depth on top of builder)",
+        "Frontend /traces page (Vue): list (sortable by ts/duration) + detail waterfall + JSON / Service Map subtabs (port from openapm/js/pages-traces.js)",
+        "Cross-tenant E2E reverse test: tenant A ingests trace, tenant B queries with own key → 0 results (no cross-talk)",
+        "Per-ingest metering event written to PG metering_events (tenant_id, signal_type='trace', count=spans_in_batch)",
+        "Slice 1 CI matrix: all backend tests pass + new ch-related integration test + frontend Traces page Playwright spec green"
+      ],
+      "out_of_scope": [
+        "Log ingest (SLICE-2)",
+        "Topology / Service detail page (SLICE-3)",
+        "Metrics ingest + Alerts (SLICE-4)",
+        "Sampling decisions (Slice 5+ — for now ingest 100%)",
+        "Trace search via attribute index (post-MVP — for now ts-range scan)"
+      ],
+      "dependencies": ["SLICE-0", "PRE-1", "PRE-2", "PRE-3"],
+      "spec": "(to be written via /harness:brainstorming — should produce docs/specs/YYYY-MM-DD-slice-1-trace-design.md)",
+      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/YYYY-MM-DD-slice-1-plan.md)",
+      "estimated_effort_days": "21",
+      "owner": "@huangbaixun",
+      "notes": "Per Slice 0 plan §5, this is the first vertical slice. Path B (vertical slice) discipline: ship a complete demo-able Trace flow before starting SLICE-2 Logs. Plan to use OTel hot-r.o.d. demo as data source (NOT old repo's simulator-service). Slice 0 lessons (docs/lessons-learned-2026-05-24.md) apply — particularly nginx /api proxy discipline and NaiveUI test selectors."
     }
   ]
 }
