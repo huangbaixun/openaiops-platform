@@ -3,19 +3,8 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-24",
   "active_branch": "main",
-  "current_focus": "Slice 0 (Foundation) DONE 2026-05-24. Pre-Slice-1 phase: 3 prerequisite decisions (PRE-1/2/3 in open_tasks) must be resolved before ANY ClickHouse-writing code. The first one to decide is PRE-1 (CH schema init mechanism) — it gates how SLICE-1's first migration is written.",
+  "current_focus": "Slice 0 (Foundation) DONE 2026-05-24. Pre-Slice-1 phase: PRE-1 RESOLVED 2026-05-24 (ADR-0002 chose ch-migrate service, scaffolded + smoke-verified). 2 prereqs remaining (PRE-2/3) before SLICE-1 can ingest. Next: PRE-2 (Query API deployment shape: extend gateway vs new cmd/query/).",
   "open_tasks": [
-    {
-      "id": "PRE-1",
-      "title": "Decide ClickHouse schema init mechanism",
-      "priority": "P0",
-      "blocks": "SLICE-1",
-      "options": [
-        "(a) docker-entrypoint-initdb.d/ — simplest, but ties to fresh-container init; no story for schema migration on running cluster",
-        "(b) ch-migrate service symmetric to PG goose, using clickhouse-client --queries-file — heavier setup but enables future migrations"
-      ],
-      "recommendation": "Option (b) for symmetry + future-proofing. Start as a one-shot like the PG migrate; later upgrade to a goose-like sequencer when CH schema starts changing post-creation."
-    },
     {
       "id": "PRE-2",
       "title": "Decide Query API deployment shape",
@@ -87,6 +76,11 @@
       "date": "2026-05-24",
       "q": "Old repo OpenAIOps fate?",
       "decision": "Archived via gh repo archive on 2026-05-24. Read-only. PR #8 merged the pivot ADR-0007 + spec + plan into old repo's main before archive."
+    },
+    {
+      "date": "2026-05-24",
+      "q": "PRE-1: ClickHouse schema init mechanism — initdb.d vs ch-migrate service?",
+      "decision": "Chose ch-migrate service symmetric to PG goose (Option B). Scaffolded: ADR-0002 + deploy/ch-migrate.sh + deploy/docker-compose.yml ch-migrate entry + backend/ch-migrations/ + Makefile migrate-ch-up target + CLAUDE.md 'CH 迁移' rule block. Forward-only, plain SQL files (no goose pragmas), idempotent via _schema_migrations tracking table. Smoke-verified all 3 paths: empty-dir no-op, apply, skip-already-applied. ALTER TABLE arrival triggers ADR-0002 revisit."
     }
   ]
 }
