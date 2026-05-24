@@ -82,14 +82,13 @@ services:
       timeout: 3s
       retries: 10
 
-  # frontend wired in T13 — placeholder commented out until then
-  # frontend:
-  #   build: ../frontend
-  #   environment:
-  #     VITE_API_BASE: "/api"
-  #   ports: ["127.0.0.1:3000:80"]
-  #   depends_on:
-  #     gateway: { condition: service_healthy }
+  frontend:
+    build: ../frontend
+    environment:
+      VITE_API_BASE: "/api"
+    ports: ["127.0.0.1:${FRONTEND_HOST_PORT:-3000}:80"]
+    depends_on:
+      gateway: { condition: service_healthy }
 
   caddy:
     image: caddy:2.7-alpine

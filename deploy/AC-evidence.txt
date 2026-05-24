@@ -53,3 +53,52 @@ Date: Sun, 24 May 2026 10:24:02 GMT
 Content-Length: 13
 
 unauthorized
+
+=== T13 — Frontend up via compose ===
+$ curl -i http://localhost:13000/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   405  100   405    0     0   335k      0 --:--:-- --:--:-- --:--:--  395k
+HTTP/1.1 200 OK
+Server: nginx/1.25.5
+Date: Sun, 24 May 2026 10:45:13 GMT
+Content-Type: text/html
+Content-Length: 405
+Last-Modified: Sun, 24 May 2026 10:41:57 GMT
+Connection: keep-alive
+ETag: "6a12d5f5-195"
+Accept-Ranges: bytes
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+=== T13 — Caddy serves frontend at https://localhost (TLS) ===
+$ curl -kI https://localhost/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0   405    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+HTTP/2 200 
+accept-ranges: bytes
+alt-svc: h3=":443"; ma=2592000
+content-type: text/html
+date: Sun, 24 May 2026 10:45:13 GMT
+etag: "6a12d5f5-195"
+last-modified: Sun, 24 May 2026 10:41:57 GMT
+server: Caddy
+server: nginx/1.25.5
+content-length: 405
+
+
+=== T13 — Caddy reverse-proxies /api/healthz to gateway ===
+$ curl -k -i -H 'Authorization: Bearer test-key-acme' https://localhost/api/healthz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100    88  100    88    0     0   1401      0 --:--:-- --:--:-- --:--:--  1419
+HTTP/2 200 
+alt-svc: h3=":443"; ma=2592000
+content-type: application/json
+date: Sun, 24 May 2026 10:45:13 GMT
+server: Caddy
+content-length: 88
+
+{"status":"ok","tenant_id":"11111111-1111-1111-1111-111111111111","tenant_name":"acme"}
