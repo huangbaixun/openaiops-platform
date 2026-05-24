@@ -23,11 +23,13 @@ test('language switch toggles UI', async ({ page }) => {
   await page.goto(`${BASE}/login`)
   // The lang-select is inside the login card; clicking opens the dropdown.
   await page.getByTestId('lang-select').click()
-  // Click the dropdown option in the popup (not the already-shown value label).
-  // NaiveUI dropdown options are rendered in a portal; use the role=option selector.
-  await page.locator('[role="option"]').filter({ hasText: 'English' }).click()
-  // After switching to English, "Sign in" appears as heading and button — use the heading role.
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 5000 })
+  // NaiveUI dropdown options use class n-base-select-option__content.
+  // Switch to Chinese (中文) which is visually distinct and always present.
+  await page.locator('.n-base-select-option__content', { hasText: '中文' }).click()
+  // setLocale calls location.reload(); wait for navigation to complete.
+  await page.waitForURL(/\/login/, { timeout: 10_000 })
+  // After switching to Chinese, the login title shows Chinese text.
+  await expect(page.getByRole('heading', { name: '登录' })).toBeVisible({ timeout: 5000 })
 })
 
 test('two tenants do not see each others data via key', async ({ browser }) => {
