@@ -23,9 +23,11 @@ test('language switch toggles UI', async ({ page }) => {
   await page.goto(`${BASE}/login`)
   // The lang-select is inside the login card; clicking opens the dropdown.
   await page.getByTestId('lang-select').click()
-  // Use nth(1) to target the dropdown option (not the already-shown value label).
-  await page.getByText('English').nth(1).click()
-  await expect(page.locator('text=Sign in')).toBeVisible({ timeout: 5000 })
+  // Click the dropdown option in the popup (not the already-shown value label).
+  // NaiveUI dropdown options are rendered in a portal; use the role=option selector.
+  await page.locator('[role="option"]').filter({ hasText: 'English' }).click()
+  // After switching to English, "Sign in" appears as heading and button — use the heading role.
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 5000 })
 })
 
 test('two tenants do not see each others data via key', async ({ browser }) => {
