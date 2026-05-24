@@ -1,0 +1,7 @@
+<clickhouse>
+    <!-- Allow setting names with the "custom_" prefix to be sent over the
+         native protocol. Required by chquery.Conn's per-query injection
+         of custom_tenant_id, which CH Row Policies reference via
+         getSetting('custom_tenant_id'). See ADR-0001 §3.3 + ADR-0003. -->
+    <custom_settings_prefixes>custom_</custom_settings_prefixes>
+</clickhouse>

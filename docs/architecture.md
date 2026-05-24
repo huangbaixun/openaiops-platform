@@ -61,7 +61,7 @@ openaiops-platform/
 │   │   ├── tenant/         domain types
 │   │   ├── config/         env loading (gains LoadQuery() at SLICE-1)
 │   │   ├── httpsrv/        graceful-shutdown template (gains Run() at SLICE-1)
-│   │   ├── chquery/        MustTenantScope helper (PRE-3 will create)
+│   │   ├── chquery/        MustTenantScope helper (landed PRE-3; see scope.go)
 │   │   └── query/          read handlers (SLICE-1 will create)
 │   ├── migrations/         PG goose migrations (3 tables, SLICE-0)
 │   └── ch-migrations/      CH migrations runner — see ADR-0002
@@ -99,13 +99,13 @@ openaiops-platform/
 
 ## Multi-tenant invariants (ADR-0001 §3.3 — load-bearing)
 
-Every CH/PG query MUST go through a builder that injects `tenant_id`. The chosen API is `chquery.MustTenantScope(ctx, base, args...) (string, []any)` — fixed by ADR-0003, implemented by PRE-3. Three layers of defense:
+Every CH/PG query MUST go through a builder that injects `tenant_id`. The chosen API is `chquery.MustTenantScope(ctx, base, args...) (string, []any)` — fixed by ADR-0003, implemented in `backend/internal/chquery/scope.go` (PRE-3). Three layers of defense:
 
 1. **Builder layer** — `MustTenantScope` panics if ctx has no tenant; injects `WHERE tenant_id = ?`. Programmer error caught at runtime.
 2. **CH Row Policy** — DB-side filter that activates per user/role. Survives even if a future helper-bypass slips through.
 3. **Cross-tenant reverse E2E** — tenant A writes / tenant B reads → MUST return 0 rows. CI gate.
 
-Layer 1+2 land with PRE-3. Layer 3 is SLICE-1 AC #8.
+Layers 1+2 landed with PRE-3. Layer 3 is SLICE-1 AC #8.
 
 ## Currently open prerequisites
 
@@ -113,6 +113,6 @@ Layer 1+2 land with PRE-3. Layer 3 is SLICE-1 AC #8.
 |---|---|---|
 | PRE-1 | ClickHouse schema migration mechanism | ✅ Resolved (ADR-0002) |
 | PRE-2 | Query API deployment shape | ✅ Resolved (ADR-0003) |
-| PRE-3 | MustTenantScope + Row Policy + reverse E2E | 🟠 Open — last gate before SLICE-1 code |
+| PRE-3 | MustTenantScope + Row Policy + reverse E2E | ✅ Resolved 2026-05-24 (layers 1+2; layer 3 = SLICE-1 AC #8) |
 
 Live state: `docs/claude-progress.json`.

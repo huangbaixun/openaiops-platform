@@ -29,8 +29,6 @@ ADRs that originate from `/harness:brainstorming` with `type: adr-proposal` get 
 
 ## Pending decisions (no ADR yet)
 
-| Tracker | Title | Owner | Blocking |
-|---|---|---|---|
-| PRE-3 | MustTenantScope builder + CH Row Policy + cross-tenant reverse E2E | @huangbaixun | SLICE-1 first CH write |
+_(none — PRE-1/2/3 all resolved; next decisions land with SLICE-1 design)_
 
-Live status lives in `docs/claude-progress.json`. When PRE-3 lands, the resulting ADR (likely 0004) gets indexed here and the PRE-3 row moves out of "Pending".
+Live status: `docs/claude-progress.json`.
