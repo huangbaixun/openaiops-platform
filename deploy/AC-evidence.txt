@@ -1,5 +1,8 @@
-NOTE: Gateway host port changed to 18080 (signoz occupied 8080). Internal container port is still :8080.
-NOTE: OTel-collector host ports changed to 14317/14318 (signoz-otel occupied 4317/4318).
+NOTE: Canonical AC verifies against http://localhost:8080. If a developer has
+SignOz or another tool occupying 8080 locally, set GATEWAY_HOST_PORT=18080
+in .env.local before `docker-compose up`, then curl against localhost:18080.
+The CI environment has no such collision and uses the default 8080.
+(captured on dev machine with GATEWAY_HOST_PORT=18080 due to local SignOz)
 
 === AC-2 (acme valid key) ===
 $ curl -i -H 'Authorization: Bearer test-key-acme' http://localhost:18080/healthz
