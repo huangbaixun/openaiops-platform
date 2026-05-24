@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "description": "openaiops-platform feature ledger. Cross-session contract; status transitions are real product gates.",
+  "updated_at": "2026-05-24",
+  "owner": "@huangbaixun",
+  "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
+  "legend": {
+    "priority": "P0=MVP blocker / P1=post-MVP / P2=enhancement",
+    "status": "proposed / building / done / done_with_concerns / superseded",
+    "effort": "engineer days (ideal, 1-person solo)"
+  },
+  "features": [
+    {
+      "id": "SLICE-0",
+      "title": "Foundation — repo skeleton + docker-compose stack + multi-tenant gateway shell",
+      "priority": "P0",
+      "status": "building",
+      "current_state": "Empty repo just created. No code, no infra, no auth.",
+      "target_state": "Engineer can `docker-compose up`, get a stack with PG/Redis/CH/Collector/Caddy/gateway/frontend; curl `/healthz` with a Bearer key returns tenant_id; browser shows Login page (中/英 switchable); CI green.",
+      "acceptance_criteria": [
+        "docker-compose up brings stack to healthy state (all services)",
+        "curl with valid Bearer API key on /healthz returns 200 + tenant_id JSON",
+        "curl without / with wrong key returns 401",
+        "two tenants seeded; each key resolves to its own tenant (no cross-talk)",
+        "Login page renders in zh-CN by default; can switch to en-US",
+        "After login, Home page shows tenant name in top bar",
+        "goose migrate up creates 3 tables; down rolls back cleanly",
+        "GitHub Actions CI (backend / frontend-unit / e2e) is green on push"
+      ],
+      "out_of_scope": [
+        "Trace / Log / Metric ingestion (Slice 1-4)",
+        "Topology / Service detail / Alerts (Slice 3-4)",
+        "AI agents / RCA (Phase 2 sibling repo openaiops-ai)",
+        "OIDC / JWT auth (v1.0)",
+        "Production hardening (TLS termination beyond local Caddy, observability of platform itself, etc.)"
+      ],
+      "dependencies": [],
+      "spec": "docs/decisions/0001-initial-architecture.md",
+      "plan": "imported from archived OpenAIOps repo docs/plans/2026-05-24-platform-rewrite-slice-0-plan.md",
+      "estimated_effort_days": "15",
+      "owner": "@huangbaixun",
+      "notes": "All 14 tasks in the plan trace to this single feature (per harness-engineering subagent grounding rule). Future slices will get their own feature entries."
+    }
+  ]
+}
