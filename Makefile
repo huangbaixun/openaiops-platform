@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe test test-go test-fe e2e migrate-up migrate-down
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe test test-go test-fe e2e migrate-up migrate-down migrate-ch-up
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -51,3 +51,9 @@ migrate-up:
 
 migrate-down:
 	cd backend && goose -dir migrations postgres "$$DATABASE_URL" down
+
+# Apply ClickHouse migrations against the running compose stack. Re-runs are
+# idempotent (skips already-applied versions via the _schema_migrations table).
+# See docs/decisions/0002-clickhouse-schema-migrations.md.
+migrate-ch-up:
+	docker-compose -f deploy/docker-compose.yml run --rm ch-migrate

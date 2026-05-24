@@ -6,7 +6,8 @@
   "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
   "history": [
     {"date": "2026-05-24", "event": "Repo created + features.json with SLICE-0 (status: building)"},
-    {"date": "2026-05-24", "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"}
+    {"date": "2026-05-24", "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"},
+    {"date": "2026-05-24", "event": "PRE-1 resolved — ADR-0002 chose ch-migrate service (Option B); scaffold landed + smoke verified"}
   ],
   "legend": {
     "priority": "P0=MVP blocker / P1=post-MVP / P2=enhancement",
@@ -59,7 +60,7 @@
       "owner": "@huangbaixun",
       "notes": "All 14 tasks in the plan traced to this single feature (per harness-engineering subagent grounding rule). Future slices (SLICE-1 Trace E2E etc.) will get their own feature entries. See ADR-0001 §5 for the slice roadmap.",
       "slice_1_prerequisites": [
-        "Decide ClickHouse schema init mechanism (docker-entrypoint-initdb.d/ vs dedicated ch-migrate service) — tracked as PRE-1 in claude-progress.json",
+        "PRE-1 RESOLVED 2026-05-24: ClickHouse schema migration mechanism — Option B (dedicated ch-migrate service) per ADR-0002. Scaffold + smoke verified.",
         "Decide Query API deployment shape (extend gateway binary vs new backend/cmd/query/ service per ADR-0001 §3.2) — tracked as PRE-2",
         "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests BEFORE first real CH write (ADR-0001 §3.3) — tracked as PRE-3"
       ]

@@ -67,6 +67,23 @@ services:
       postgres: { condition: service_healthy }
     restart: "no"
 
+  ch-migrate:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    entrypoint: ["/bin/sh"]
+    command: ["/run.sh"]
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "9000"
+      CH_USER: openaiops
+      CH_PASSWORD: openaiops
+      CH_DATABASE: openaiops
+    volumes:
+      - ./ch-migrate.sh:/run.sh:ro
+      - ../backend/ch-migrations:/migrations:ro
+    depends_on:
+      clickhouse: { condition: service_healthy }
+    restart: "no"
+
   gateway:
     build: ../backend
     environment:

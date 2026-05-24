@@ -15,9 +15,14 @@
 ### 端口
 - canonical 8080 / 4317 / 4318 / 3000。本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `OTEL_GRPC_HOST_PORT` / `OTEL_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
 
-### Goose 迁移
+### Goose 迁移（PG）
 - PG schema 改写新 `backend/migrations/YYYYMMDDHHMMSS_<verb>.sql`，必带 `-- +goose Up` 和 `-- +goose Down`。
-- CH schema 初始化机制是 SLICE-1 前置决策（PRE-1，见 `features.json`）—— 决定前不要起任何 CH 表 DDL。
+
+### CH 迁移（自研 runner，forward-only · ADR-0002）
+- CH schema 改写新 `backend/ch-migrations/YYYYMMDDHHMMSS_<verb>.sql`，**纯 SQL**（不带 goose pragma），可多语句分号分隔。
+- 业务表第一列必须 `tenant_id LowCardinality(String)`，`ORDER BY (tenant_id, ...)` 打头（ADR-0001 §3.3）。
+- 应用方式：`make up` 自动跑 `ch-migrate` 服务；或 `make migrate-ch-up` 单独跑。re-run 幂等（`_schema_migrations` 跟踪表）。
+- 无 DOWN。dev 想撤就 `docker compose down -v` 清 `chdata` 重来。第一次出现 `ALTER TABLE` 之前必须回到 ADR-0002 重谈。
 
 ### Bcrypt 测试
 - 任何接 `apikey.Hash` 的测试需 `-timeout` 至少 60s（每次 hash ~150ms）。包级 timeout 120s+；CI 240s+ for integration。
