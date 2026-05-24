@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe test test-go test-fe e2e migrate-up migrate-down migrate-ch-up
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-fe e2e migrate-up migrate-down migrate-ch-up
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -24,13 +24,16 @@ fmt-go:
 fmt-fe:
 	@if [ -d frontend ]; then cd frontend && npm run format; else echo "skip fmt-fe: frontend/ not yet created"; fi
 
-lint: lint-go lint-fe
+lint: lint-go lint-fe lint-ch
 
 lint-go:
 	@if [ -d backend ]; then cd backend && golangci-lint run ./...; else echo "skip lint-go: backend/ not yet created"; fi
 
 lint-fe:
 	@if [ -d frontend ]; then cd frontend && npm run lint; else echo "skip lint-fe: frontend/ not yet created"; fi
+
+lint-ch:
+	@./deploy/lint-no-bare-ch.sh
 
 test: test-go test-fe
 
