@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Repo-level Claude Code config. User-level harness-engineering plugin (~/.claude/plugins) already provides SessionStart checklist + telemetry hooks — do NOT duplicate them here. This file only defines repo-specific permission shortcuts so common project commands don't prompt every time. To extend with project-specific hooks, see .claude/hooks/README.md.",
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
+      "Bash(go fmt:*)",
+      "Bash(gofmt:*)",
+      "Bash(cd backend && go *:*)",
+      "Bash(npm run *:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx playwright:*)",
+      "Bash(cd frontend && npm *:*)",
+      "Bash(cd frontend && npx *:*)",
+      "Bash(make up:*)",
+      "Bash(make down:*)",
+      "Bash(make seed:*)",
+      "Bash(make smoke:*)",
+      "Bash(make test:*)",
+      "Bash(make e2e:*)",
+      "Bash(make migrate-up:*)",
+      "Bash(make migrate-ch-up:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml ps:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml logs:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml config:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml exec:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml run:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml up:*)",
+      "Bash(docker compose -f deploy/docker-compose.yml down:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)"
+    ]
+  }
+}
