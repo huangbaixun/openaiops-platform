@@ -55,24 +55,26 @@ jobs:
 
       - name: generate seed hashes (Go bcrypt) and patch seed.sql
         run: |
-          cd backend
-          ACME_HASH=$(go run ./cmd/seed-hash test-key-acme)
-          BETA_HASH=$(go run ./cmd/seed-hash test-key-beta)
+          ACME_HASH=$(cd backend && go run ./cmd/seed-hash test-key-acme)
+          BETA_HASH=$(cd backend && go run ./cmd/seed-hash test-key-beta)
           echo "ACME_HASH=$ACME_HASH"
           echo "BETA_HASH=$BETA_HASH"
-          cd ../deploy
-          # Replace placeholder hashes (assume existing values are real bcrypt strings from earlier commit — replace them)
-          # Use python to safely substitute since bcrypt strings have $ signs.
-          python3 - <<EOF
+          # Write hashes to temp files to avoid $ interpolation issues in heredoc
+          echo "$ACME_HASH" > /tmp/acme_hash.txt
+          echo "$BETA_HASH" > /tmp/beta_hash.txt
+          # Use python to safely substitute since bcrypt strings have $ signs
+          python3 - deploy/seed.sql /tmp/acme_hash.txt /tmp/beta_hash.txt <<'PYEOF'
           import re, sys
-          with open('seed.sql') as f:
+          sql_path, acme_file, beta_file = sys.argv[1], sys.argv[2], sys.argv[3]
+          acme_hash = open(acme_file).read().strip()
+          beta_hash = open(beta_file).read().strip()
+          with open(sql_path) as f:
               content = f.read()
-          # Replace acme key hash
-          content = re.sub(r"('acme-primary',\s*)'[^']*'", lambda m: m.group(1) + "'$ACME_HASH'", content)
-          content = re.sub(r"('beta-primary',\s*)'[^']*'", lambda m: m.group(1) + "'$BETA_HASH'", content)
-          with open('seed.sql', 'w') as f:
+          content = re.sub(r"('acme-primary',\s*)'[^']*'", lambda m: m.group(1) + "'" + acme_hash + "'", content)
+          content = re.sub(r"('beta-primary',\s*)'[^']*'", lambda m: m.group(1) + "'" + beta_hash + "'", content)
+          with open(sql_path, 'w') as f:
               f.write(content)
-          EOF
+          PYEOF
           # Verify substitution
           grep -E "acme-primary|beta-primary" deploy/seed.sql
 
