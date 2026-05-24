@@ -28,8 +28,8 @@ test('language switch toggles UI', async ({ page }) => {
   await page.locator('.n-base-select-option__content', { hasText: '中文' }).click()
   // setLocale calls location.reload(); wait for navigation to complete.
   await page.waitForURL(/\/login/, { timeout: 10_000 })
-  // After switching to Chinese, the login title shows Chinese text.
-  await expect(page.getByRole('heading', { name: '登录' })).toBeVisible({ timeout: 5000 })
+  // After switching to Chinese, the submit button shows the Chinese text.
+  await expect(page.getByTestId('submit-btn')).toContainText('登录', { timeout: 5000 })
 })
 
 test('two tenants do not see each others data via key', async ({ browser }) => {
