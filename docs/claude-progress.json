@@ -3,25 +3,14 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-24",
   "active_branch": "main",
-  "current_focus": "Slice 0 (Foundation) DONE 2026-05-24. Pre-Slice-1 phase: PRE-1 RESOLVED 2026-05-24 (ADR-0002 chose ch-migrate service, scaffolded + smoke-verified). 2 prereqs remaining (PRE-2/3) before SLICE-1 can ingest. Next: PRE-2 (Query API deployment shape: extend gateway vs new cmd/query/).",
+  "current_focus": "Slice 0 (Foundation) DONE 2026-05-24. Pre-Slice-1 phase: PRE-1 + PRE-2 RESOLVED 2026-05-24 (ADR-0002 ch-migrate service; ADR-0003 split cmd/query/ from day 1). 1 prereq remaining: PRE-3 (MustTenantScope + CH Row Policy + cross-tenant reverse E2E). PRE-3 is the last gate before SLICE-1 implementation can start.",
   "open_tasks": [
-    {
-      "id": "PRE-2",
-      "title": "Decide Query API deployment shape",
-      "priority": "P0",
-      "blocks": "SLICE-1",
-      "options": [
-        "(a) Extend gateway binary — one Dockerfile, shared middleware, fast to ship",
-        "(b) Separate cmd/query/ service per ADR-0001 §3.2 — independent scaling, cleaner boundary"
-      ],
-      "recommendation": "Option (a) for Slice 1 (single binary suffices at pre-prod scale); split when load testing shows gateway-vs-query traffic patterns diverge meaningfully. Cost of splitting later is moderate (1-2 days)."
-    },
     {
       "id": "PRE-3",
       "title": "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests",
       "priority": "P0",
       "blocks": "SLICE-1 first CH write",
-      "notes": "ADR-0001 §3.3's 3-layer multi-tenant safeguard. Must land BEFORE any code writes/queries CH with real (non-test-fixture) data. The MustTenantScope helper is the API the rest of the codebase will rely on — design it carefully."
+      "notes": "ADR-0001 §3.3's 3-layer multi-tenant safeguard. Must land BEFORE any code writes/queries CH with real (non-test-fixture) data. API surface fixed by ADR-0003: chquery.MustTenantScope(ctx, base, args...) (string, []any). Implementation includes: (1) the helper itself with ctx-no-tenant panic + ctx-with-tenant predicate injection, (2) CH Row Policy DDL in the first ch-migration file, (3) cross-tenant reverse E2E test (tenant A writes → tenant B reads → 0 results), (4) CI lint that any file under internal/query/ or internal/ingest/ calling ch.Query(/ch.Exec(/conn.QueryRow( directly fails the build."
     }
   ],
   "recently_completed": [
@@ -81,6 +70,11 @@
       "date": "2026-05-24",
       "q": "PRE-1: ClickHouse schema init mechanism — initdb.d vs ch-migrate service?",
       "decision": "Chose ch-migrate service symmetric to PG goose (Option B). Scaffolded: ADR-0002 + deploy/ch-migrate.sh + deploy/docker-compose.yml ch-migrate entry + backend/ch-migrations/ + Makefile migrate-ch-up target + CLAUDE.md 'CH 迁移' rule block. Forward-only, plain SQL files (no goose pragmas), idempotent via _schema_migrations tracking table. Smoke-verified all 3 paths: empty-dir no-op, apply, skip-already-applied. ALTER TABLE arrival triggers ADR-0002 revisit."
+    },
+    {
+      "date": "2026-05-24",
+      "q": "PRE-2: Query API deployment shape — extend gateway vs separate cmd/query/?",
+      "decision": "Chose Option B (split cmd/query/ from day 1) per ADR-0003. Brainstormed via /harness:brainstorming. Decision driven by 2 confirmed assumptions: (1) workload Heavy (server-side aggregation known coming), (2) Heavy arrives SLICE-1/2 (within ~1 month). Under Heavy + soon, original progress.json Option-A recommendation inverts because future-split cost gets paid by the first query that saturates gateway CPU. Spec at docs/specs/2026-05-24-pre-2-query-api-deployment-design.md; ADR at docs/decisions/0003-query-api-deployment-shape.md. CLAUDE.md '二进制 + 路由划分' block added. Locks: chquery.MustTenantScope signature; metering write-path-only; multi-binary single-image Dockerfile pattern."
     }
   ]
 }

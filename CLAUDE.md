@@ -13,7 +13,14 @@
 - Slice 1 起：所有 CH 查询必须经 `MustTenantScope(ctx, q)` helper（待实现，ADR-0001 §3.3 三层兜底 = builder + CH Row Policy + 反例 E2E）。
 
 ### 端口
-- canonical 8080 / 4317 / 4318 / 3000。本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `OTEL_GRPC_HOST_PORT` / `OTEL_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
+- canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 / 3000。本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `OTEL_GRPC_HOST_PORT` / `OTEL_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
+
+### 二进制 + 路由划分（ADR-0003）
+- gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/healthz`、`/livez`。依赖 PG。
+- query (`cmd/query`, :8081)：CH 读路径 — `/api/v1/traces*`、`/api/v1/logs*`、`/api/v1/services*`、`/api/v1/topology*`。依赖 PG (auth) + CH (data)。
+- Caddy 用 `handle`（保留前缀）按路径分发 — query 前缀优先匹配，其它 `/api/*` 落 gateway。
+- 共享代码全在 `backend/internal/` — `auth`、`apikey`、`tenant`、`config`、`httpsrv`、`chquery`（PRE-3 实现）。`internal/query/` 和 `internal/ingest/` 下任何裸 `ch.Query(`/`ch.Exec(` 都 lint fail，必走 `chquery.MustTenantScope`。
+- metering 只在写路径写。查询请求**不**写 `metering_events`（页面刷新即烧额度=糟糕 UX，v0.1 决定）。
 
 ### Goose 迁移（PG）
 - PG schema 改写新 `backend/migrations/YYYYMMDDHHMMSS_<verb>.sql`，必带 `-- +goose Up` 和 `-- +goose Down`。
