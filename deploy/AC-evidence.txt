@@ -102,3 +102,11 @@ server: Caddy
 content-length: 88
 
 {"status":"ok","tenant_id":"11111111-1111-1111-1111-111111111111","tenant_name":"acme"}
+
+=== AC-6 — GitHub Actions CI green ===
+$ gh run list --branch main --limit 1
+completed	success	fix(e2e): assert submit-btn text for lang switch (avoids NaiveUI head…	ci	main	push	26359958968	6m32s	2026-05-24T11:27:10Z
+
+Run URL: https://github.com/huangbaixun/openaiops-platform/actions/runs/26359958968
+Jobs: backend ✓ (Go vet + unit + integration) | frontend-unit ✓ (build + vitest) | e2e ✓ (4 Playwright specs)
+Duration: 6m32s | Date: 2026-05-24
