@@ -1,0 +1,5 @@
+<clickhouse>
+    <!-- Allow custom_ prefixed user-defined settings, used by chquery.Conn
+         to propagate tenant_id to CH Row Policies (ADR-0001 §3.3 layer 2). -->
+    <custom_settings_prefixes>SQL_,custom_</custom_settings_prefixes>
+</clickhouse>

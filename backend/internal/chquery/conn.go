@@ -39,6 +39,23 @@ func Connect(ctx context.Context, dsn string) (*Conn, error) {
 // Close releases the underlying driver connection.
 func (cn *Conn) Close() error { return cn.c.Close() }
 
+// tenantSettings returns the clickhouse.Settings map that injects the current
+// tenant's ID as a user-defined custom setting. The CH native protocol
+// distinguishes "important" (builtin) settings from "custom" (user-defined)
+// ones via a protocol flag; clickhouse-go v2 maps that flag to
+// clickhouse.CustomSetting. Without wrapping the value in CustomSetting{},
+// the driver marks the setting as Important=true and CH 23.12+ rejects it
+// with "Unknown setting" (code 115) for any name not in its builtin list.
+//
+// The custom_settings_prefixes config (custom_settings.xml) must allow
+// the "custom_" prefix for this to be accepted by CH. In production, that
+// config is applied via Helm/Ansible before the app connects.
+func tenantSettings(tid interface{ String() string }) clickhouse.Settings {
+	return clickhouse.Settings{
+		"custom_tenant_id": clickhouse.CustomSetting{Value: tid.String()},
+	}
+}
+
 // Query executes a SELECT (or other read) with tenant scoping enforced.
 // The query string MUST contain "tenant_id = ?"; MustTenantScope panics otherwise.
 // The tenant_id session setting is also injected, so any CH Row Policy referencing
@@ -46,9 +63,7 @@ func (cn *Conn) Close() error { return cn.c.Close() }
 func (cn *Conn) Query(ctx context.Context, query string, args ...any) (driver.Rows, error) {
 	q, scopedArgs := MustTenantScope(ctx, query, args...)
 	tid, _ := auth.TenantID(ctx)
-	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(clickhouse.Settings{
-		"custom_tenant_id": tid.String(),
-	}))
+	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(tenantSettings(tid)))
 	return cn.c.Query(ctxWithSettings, q, scopedArgs...)
 }
 
@@ -58,9 +73,7 @@ func (cn *Conn) Query(ctx context.Context, query string, args ...any) (driver.Ro
 func (cn *Conn) Exec(ctx context.Context, query string, args ...any) error {
 	q, scopedArgs := MustTenantScope(ctx, query, args...)
 	tid, _ := auth.TenantID(ctx)
-	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(clickhouse.Settings{
-		"custom_tenant_id": tid.String(),
-	}))
+	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(tenantSettings(tid)))
 	return cn.c.Exec(ctxWithSettings, q, scopedArgs...)
 }
 
@@ -68,8 +81,6 @@ func (cn *Conn) Exec(ctx context.Context, query string, args ...any) error {
 func (cn *Conn) QueryRow(ctx context.Context, query string, args ...any) driver.Row {
 	q, scopedArgs := MustTenantScope(ctx, query, args...)
 	tid, _ := auth.TenantID(ctx)
-	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(clickhouse.Settings{
-		"custom_tenant_id": tid.String(),
-	}))
+	ctxWithSettings := clickhouse.Context(ctx, clickhouse.WithSettings(tenantSettings(tid)))
 	return cn.c.QueryRow(ctxWithSettings, q, scopedArgs...)
 }
