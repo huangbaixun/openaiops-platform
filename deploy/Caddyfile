@@ -1,0 +1,22 @@
+{
+	local_certs
+	auto_https disable_redirects
+}
+
+localhost {
+	tls internal
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy gateway:8080
+	}
+
+	# Frontend reverse proxy wired in T13
+	# handle {
+	# 	reverse_proxy frontend:80
+	# }
+
+	handle {
+		respond "frontend not yet built (Slice 0 T13 will wire it)" 200
+	}
+}

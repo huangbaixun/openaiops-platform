@@ -1,0 +1,110 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openaiops
+      POSTGRES_PASSWORD: openaiops
+      POSTGRES_DB: openaiops
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openaiops"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    environment:
+      CLICKHOUSE_USER: openaiops
+      CLICKHOUSE_PASSWORD: openaiops
+      CLICKHOUSE_DB: openaiops
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - chdata:/var/lib/clickhouse
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:8123:8123"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "127.0.0.1:14317:4317"
+      - "127.0.0.1:14318:4318"
+    depends_on:
+      clickhouse: { condition: service_healthy }
+
+  migrate:
+    image: golang:1.25-alpine
+    working_dir: /src
+    volumes:
+      - ../backend:/src
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+    command: >
+      sh -c "go install github.com/pressly/goose/v3/cmd/goose@v3.19.2 &&
+             /go/bin/goose -dir migrations postgres \"$$DATABASE_URL\" up"
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  gateway:
+    build: ../backend
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+      GATEWAY_LISTEN_ADDR: ":8080"
+    ports: ["127.0.0.1:18080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # frontend wired in T13 — placeholder commented out until then
+  # frontend:
+  #   build: ../frontend
+  #   environment:
+  #     VITE_API_BASE: "/api"
+  #   ports: ["127.0.0.1:3000:80"]
+  #   depends_on:
+  #     gateway: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2.7-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      gateway: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  chdata:
+  caddy_data:
+  caddy_config:
