@@ -10,7 +10,9 @@
 - 任何 PG/CH 查询必须 tenant-scoped；**禁裸 SQL**，必走 query builder。
 - 新增受保护路由必须挂 `auth.Middleware(resolver)`，handler 必须调 `auth.TenantID(r.Context())` —— 否则在路由层就静默漏。
 - 新 CH 表第一列必须 `tenant_id LowCardinality(String)`，`ORDER BY (tenant_id, ...)` 打头。
-- Slice 1 起：所有 CH 查询必须经 `MustTenantScope(ctx, q)` helper（待实现，ADR-0001 §3.3 三层兜底 = builder + CH Row Policy + 反例 E2E）。
+- 所有 CH 查询走 `backend/internal/chquery.Conn` —— 内部强制 `MustTenantScope(ctx, query, args)` + 注入 `custom_tenant_id` session 设置触发 Row Policy。任何 `internal/query/` 或 `internal/ingest/` 下裸 import clickhouse-go 都被 `make lint-ch` / CI 拒。
+- 业务 CH 表 DDL 必须挂 Row Policy `USING tenant_id = getSetting('custom_tenant_id') TO openaiops`（模板见 `backend/ch-migrations/README.md`）；CH server 端 `custom_settings_prefixes` 配置走 `deploy/clickhouse-custom-settings.xml` bind-mount。
+- 反例 E2E（A 写 / B 读 → 0）是 SLICE-1 AC #8 落地，不是 PRE-3。
 
 ### 端口
 - canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 / 3000。本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `OTEL_GRPC_HOST_PORT` / `OTEL_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。

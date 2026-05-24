@@ -3,14 +3,14 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-24",
   "active_branch": "main",
-  "current_focus": "Slice 0 (Foundation) DONE 2026-05-24. Pre-Slice-1 phase: PRE-1 + PRE-2 RESOLVED 2026-05-24 (ADR-0002 ch-migrate service; ADR-0003 split cmd/query/ from day 1). 1 prereq remaining: PRE-3 (MustTenantScope + CH Row Policy + cross-tenant reverse E2E). PRE-3 is the last gate before SLICE-1 implementation can start.",
+  "current_focus": "Slice 0 DONE. All 3 SLICE-1 prerequisites RESOLVED 2026-05-24: PRE-1 (ADR-0002 ch-migrate), PRE-2 (ADR-0003 split cmd/query/), PRE-3 (chquery package + Row Policy template + lint). SLICE-1 implementation is now unblocked. Next: /harness:brainstorming for SLICE-1 design (Trace ingest E2E).",
   "open_tasks": [
     {
-      "id": "PRE-3",
-      "title": "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests",
+      "id": "SLICE-1-PREP-1",
+      "title": "chquery.Conn batch-insert support before SLICE-1 ingester",
       "priority": "P0",
-      "blocks": "SLICE-1 first CH write",
-      "notes": "ADR-0001 §3.3's 3-layer multi-tenant safeguard. Must land BEFORE any code writes/queries CH with real (non-test-fixture) data. API surface fixed by ADR-0003: chquery.MustTenantScope(ctx, base, args...) (string, []any). Implementation includes: (1) the helper itself with ctx-no-tenant panic + ctx-with-tenant predicate injection, (2) CH Row Policy DDL in the first ch-migration file, (3) cross-tenant reverse E2E test (tenant A writes → tenant B reads → 0 results), (4) CI lint that any file under internal/query/ or internal/ingest/ calling ch.Query(/ch.Exec(/conn.QueryRow( directly fails the build."
+      "blocks": "SLICE-1 ingester (high-throughput trace writes)",
+      "notes": "PRE-3 Task 3 code review flagged: chquery.Conn currently exposes only Query/Exec/QueryRow. clickhouse-go's PrepareBatch / AsyncInsert (high-throughput write paths) are NOT wrapped. SLICE-1 ingester will need these to handle realistic OTLP throughput. Either extend chquery.Conn with tenant-aware batch helpers, or accept a documented escape valve (raw driver access from ingest path with lint exception). Decide during SLICE-1 brainstorming."
     }
   ],
   "recently_completed": [
@@ -31,6 +31,11 @@
       "date": "2026-05-24",
       "kind": "handoff",
       "note": "Old repo huangbaixun/OpenAIOps archived 2026-05-24 (PR #8 merged, then gh repo archive). All non-doc code is in this new repo. Spec + ADR-0007 also live in this repo as docs/decisions/0001-initial-architecture.md (imported from old repo's docs/specs/2026-05-24-platform-rewrite-design.md)."
+    },
+    {
+      "date": "2026-05-24",
+      "kind": "lesson",
+      "note": "PRE-3 Task 4 surfaced a clickhouse-go/v2 protocol quirk: per-query Settings sent over the native protocol default to is_important=true, which CH validates against builtin-settings only. Custom names (custom_*) MUST be wrapped in clickhouse.CustomSetting{Value: ...} to flip the flag to 0x02. Also: CH 23.12 server requires custom_settings_prefixes config to allow the custom_ prefix at all. Without BOTH pieces, layer 2 of ADR-0001 §3.3 silently fails — code looks correct, but Row Policy never sees the setting."
     }
   ],
   "known_drift": [
@@ -75,6 +80,11 @@
       "date": "2026-05-24",
       "q": "PRE-2: Query API deployment shape — extend gateway vs separate cmd/query/?",
       "decision": "Chose Option B (split cmd/query/ from day 1) per ADR-0003. Brainstormed via /harness:brainstorming. Decision driven by 2 confirmed assumptions: (1) workload Heavy (server-side aggregation known coming), (2) Heavy arrives SLICE-1/2 (within ~1 month). Under Heavy + soon, original progress.json Option-A recommendation inverts because future-split cost gets paid by the first query that saturates gateway CPU. Spec at docs/specs/2026-05-24-pre-2-query-api-deployment-design.md; ADR at docs/decisions/0003-query-api-deployment-shape.md. CLAUDE.md '二进制 + 路由划分' block added. Locks: chquery.MustTenantScope signature; metering write-path-only; multi-binary single-image Dockerfile pattern."
+    },
+    {
+      "date": "2026-05-24",
+      "q": "PRE-3: how to implement MustTenantScope + Row Policy + lint?",
+      "decision": "Three-layer defense landed per plan docs/plans/2026-05-24-pre-3-must-tenant-scope-plan.md. Layer 1: chquery.MustTenantScope helper validates 'tenant_id = ?' (SELECT) or '(tenant_id,' (INSERT) shape + panics on missing tenant. Layer 2: chquery.Conn wraps clickhouse-go/v2 driver and injects custom_tenant_id session setting via clickhouse.CustomSetting{} wrapper (discovered during smoke testing — raw values get rejected as builtin-setting). CH server must have custom_settings_prefixes=custom_ config (deploy/clickhouse-custom-settings.xml bind-mounted in compose). CH Row Policy template provided in backend/ch-migrations/README.md for SLICE-1 migrations. Layer 3: cross-tenant reverse E2E is SLICE-1 AC #8 (needs traces_v1 table first). Build-time lint deploy/lint-no-bare-ch.sh + make lint-ch + CI step forbids bare clickhouse-go imports outside internal/chquery. 7 commits 80344d7..ce7ed1b. Dockertest smoke (TestSmoke_TenantIsolation) validates layer 1+2 against real CH 23.12."
     }
   ]
 }

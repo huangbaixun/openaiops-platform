@@ -8,7 +8,8 @@
     {"date": "2026-05-24", "event": "Repo created + features.json with SLICE-0 (status: building)"},
     {"date": "2026-05-24", "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"},
     {"date": "2026-05-24", "event": "PRE-1 resolved — ADR-0002 chose ch-migrate service (Option B); scaffold landed + smoke verified"},
-    {"date": "2026-05-24", "event": "PRE-2 resolved — ADR-0003 chose split cmd/query/ (Option B) under Heavy-soon workload assumption; spec + ADR landed, no code changes yet"}
+    {"date": "2026-05-24", "event": "PRE-2 resolved — ADR-0003 chose split cmd/query/ (Option B) under Heavy-soon workload assumption; spec + ADR landed, no code changes yet"},
+    {"date": "2026-05-24", "event": "PRE-3 resolved — chquery package (MustTenantScope helper + Conn wrapper) + Row Policy template + prod CH custom_settings config + build-time lint. SLICE-1 unblocked. 7 commits 80344d7..ce7ed1b."}
   ],
   "legend": {
     "priority": "P0=MVP blocker / P1=post-MVP / P2=enhancement",
@@ -63,7 +64,7 @@
       "slice_1_prerequisites": [
         "PRE-1 RESOLVED 2026-05-24: ClickHouse schema migration mechanism — Option B (dedicated ch-migrate service) per ADR-0002. Scaffold + smoke verified.",
         "PRE-2 RESOLVED 2026-05-24: Query API deployment shape — Option B (split cmd/query/ from day 1) per ADR-0003, under Heavy-soon workload assumption. Spec + ADR landed; scaffolding deferred to SLICE-1 T1-T3 sequenced after PRE-3.",
-        "Implement MustTenantScope query builder + CH Row Policy + cross-tenant E2E reverse tests BEFORE first real CH write (ADR-0001 §3.3) — tracked as PRE-3"
+        "PRE-3 RESOLVED 2026-05-24: chquery.MustTenantScope + chquery.Conn (clickhouse-go/v2 wrapper) + Row Policy template (backend/ch-migrations/README.md) + prod CH custom_settings_prefixes config (deploy/clickhouse-custom-settings.xml) + build-time lint (make lint-ch). Cross-tenant reverse E2E (3rd layer of ADR-0001 §3.3) is SLICE-1 AC #8."
       ]
     },
     {
