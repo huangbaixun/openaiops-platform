@@ -10,9 +10,11 @@
 
 ```bash
 make up        # docker-compose up -d
-make seed      # create test tenant + API key, prints the key
-make smoke     # curl /healthz with the seeded key
+make seed      # seed two test tenants (acme, beta) with fixed dev API keys (see deploy/seed.sql)
+make smoke     # curl /healthz with the 'acme' test key (test-key-acme)
 ```
+
+> Note: the dev seed keys are intentionally public and only valid for local docker-compose use. Production deployment must rotate them.
 
 ## Layout
 

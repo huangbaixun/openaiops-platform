@@ -2,6 +2,9 @@
 /backend/gateway
 /backend/*.test
 /backend/coverage.out
+/backend/coverage.html
+/backend/*.coverprofile
+/backend/vendor/
 
 # Node
 /frontend/node_modules

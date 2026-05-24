@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt lint test test-go test-fe e2e migrate-up migrate-down
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe test test-go test-fe e2e migrate-up migrate-down
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -16,13 +16,21 @@ smoke:
 	@KEY=test-key-acme; \
 	curl -sf -H "Authorization: Bearer $$KEY" http://localhost:8080/healthz | jq .
 
-fmt:
-	cd backend && gofmt -w . && go vet ./...
-	cd frontend && npm run format
+fmt: fmt-go fmt-fe
 
-lint:
-	cd backend && golangci-lint run ./...
-	cd frontend && npm run lint
+fmt-go:
+	@if [ -d backend ]; then cd backend && gofmt -w . && go vet ./...; else echo "skip fmt-go: backend/ not yet created"; fi
+
+fmt-fe:
+	@if [ -d frontend ]; then cd frontend && npm run format; else echo "skip fmt-fe: frontend/ not yet created"; fi
+
+lint: lint-go lint-fe
+
+lint-go:
+	@if [ -d backend ]; then cd backend && golangci-lint run ./...; else echo "skip lint-go: backend/ not yet created"; fi
+
+lint-fe:
+	@if [ -d frontend ]; then cd frontend && npm run lint; else echo "skip lint-fe: frontend/ not yet created"; fi
 
 test: test-go test-fe
 
@@ -35,6 +43,9 @@ test-fe:
 e2e:
 	cd frontend && npx playwright test
 
+# Migration targets require DATABASE_URL env var set, e.g.:
+#   export DATABASE_URL=postgres://openaiops:openaiops@localhost:5432/openaiops?sslmode=disable
+# When running against the local compose stack (deploy/docker-compose.yml), use the URL above.
 migrate-up:
 	cd backend && goose -dir migrations postgres "$$DATABASE_URL" up
 
