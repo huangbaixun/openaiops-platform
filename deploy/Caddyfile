@@ -6,6 +6,12 @@
 localhost {
 	tls internal
 
+	# Query prefix wins first. Query mounts routes at /api/v1/traces*, so do NOT strip.
+	handle /api/v1/traces* {
+		reverse_proxy query:8081
+	}
+
+	# All other /api/* go to gateway.
 	handle /api/* {
 		uri strip_prefix /api
 		reverse_proxy gateway:8080

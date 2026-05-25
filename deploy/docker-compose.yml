@@ -49,17 +49,6 @@ services:
       timeout: 3s
       retries: 20
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.96.0
-    command: ["--config=/etc/otel/config.yaml"]
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel/config.yaml:ro
-    ports:
-      - "127.0.0.1:${OTEL_GRPC_HOST_PORT:-4317}:4317"
-      - "127.0.0.1:${OTEL_HTTP_HOST_PORT:-4318}:4318"
-    depends_on:
-      clickhouse: { condition: service_healthy }
-
   migrate:
     image: golang:1.25-alpine
     working_dir: /src
@@ -106,6 +95,48 @@ services:
       timeout: 3s
       retries: 10
 
+  query:
+    build: ../backend
+    entrypoint: ["/usr/local/bin/query"]
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+      CLICKHOUSE_DSN: "clickhouse://openaiops:openaiops@clickhouse:9000/openaiops"
+      QUERY_LISTEN_ADDR: ":8081"
+    ports: ["127.0.0.1:${QUERY_HOST_PORT:-8081}:8081"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      ch-migrate: { condition: service_completed_successfully }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ingester:
+    build: ../backend
+    entrypoint: ["/usr/local/bin/ingester"]
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+      CLICKHOUSE_DSN: "clickhouse://openaiops:openaiops@clickhouse:9000/openaiops"
+      INGESTER_OTLP_GRPC_ADDR: "0.0.0.0:4317"
+      INGESTER_OTLP_HTTP_ADDR: "0.0.0.0:4318"
+      INGESTER_ADMIN_ADDR: "0.0.0.0:8082"
+    ports:
+      - "127.0.0.1:${INGESTER_OTLP_GRPC_HOST_PORT:-4317}:4317"
+      - "127.0.0.1:${INGESTER_OTLP_HTTP_HOST_PORT:-4318}:4318"
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      ch-migrate: { condition: service_completed_successfully }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   frontend:
     build: ../frontend
     environment:
@@ -125,6 +156,17 @@ services:
       - caddy_config:/config
     depends_on:
       gateway: { condition: service_healthy }
+      query: { condition: service_healthy }
+
+  hot-r-o-d:
+    image: jaegertracing/example-hotrod:1.57
+    profiles: ["demo"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://ingester:4317"
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer test-key-acme"
+    ports: ["127.0.0.1:8090:8080"]
+    depends_on:
+      ingester: { condition: service_healthy }
 
 volumes:
   pgdata:
