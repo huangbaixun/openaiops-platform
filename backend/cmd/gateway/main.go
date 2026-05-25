@@ -42,13 +42,13 @@ func main() {
 	router := httpsrv.NewRouter(resolver)
 
 	srv := &http.Server{
-		Addr:              cfg.ListenAddr,
+		Addr:              cfg.GatewayListenAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	go func() {
-		logger.Info("gateway listening", "addr", cfg.ListenAddr)
+		logger.Info("gateway listening", "addr", cfg.GatewayListenAddr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("listen", "err", err)
 			os.Exit(1)
