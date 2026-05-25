@@ -11,7 +11,7 @@ import (
 func TestList_InvalidSort_400(t *testing.T) {
 	h := NewTracesHandler(nil) // ch unused — param parse rejects first
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces?sort=DROP%20TABLE", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces?sort=DROP%20TABLE", nil)
 	h.List(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
@@ -21,7 +21,7 @@ func TestList_InvalidSort_400(t *testing.T) {
 func TestList_InvalidOrder_400(t *testing.T) {
 	h := NewTracesHandler(nil)
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces?order=random", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces?order=random", nil)
 	h.List(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
@@ -29,7 +29,7 @@ func TestList_InvalidOrder_400(t *testing.T) {
 }
 
 func TestParseListParams_LimitClamped(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces?limit=99999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces?limit=99999", nil)
 	p, err := parseListParams(req)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestParseListParams_LimitClamped(t *testing.T) {
 }
 
 func TestParseListParams_LimitMin(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces?limit=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces?limit=0", nil)
 	p, err := parseListParams(req)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestParseListParams_LimitMin(t *testing.T) {
 }
 
 func TestParseListParams_DefaultsAreSane(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces", nil)
 	p, err := parseListParams(req)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestParseListParams_DefaultsAreSane(t *testing.T) {
 }
 
 func TestParseListParams_InvalidTsFrom_Error(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces?ts_from=not-a-time", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces?ts_from=not-a-time", nil)
 	if _, err := parseListParams(req); err == nil {
 		t.Fatal("expected error")
 	}
@@ -75,7 +75,7 @@ func TestDetail_MissingTraceID_400(t *testing.T) {
 	h := NewTracesHandler(nil)
 	rec := httptest.NewRecorder()
 	// No chi router → chi.URLParam returns "".
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/traces/", nil)
 	h.Detail(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
