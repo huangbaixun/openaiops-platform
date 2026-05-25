@@ -1,5 +1,5 @@
 -- traces_v1: SLICE-1 OTLP span landing table. See docs/specs/2026-05-25-slice-1-trace-design.md §3.
-CREATE TABLE traces_v1 (
+CREATE TABLE IF NOT EXISTS traces_v1 (
     tenant_id           LowCardinality(String),
     trace_id            String CODEC(ZSTD(1)),
     span_id             String CODEC(ZSTD(1)),
@@ -14,10 +14,11 @@ CREATE TABLE traces_v1 (
     attributes          Map(LowCardinality(String), String),
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4
 ) ENGINE = MergeTree
+-- Partition ceiling: ~9000 active partitions at 100 tenants x 90 days. See spec §3.
 PARTITION BY (tenant_id, toYYYYMMDD(ts))
 ORDER BY (tenant_id, service, ts)
 SETTINGS index_granularity = 8192;
 
-CREATE ROW POLICY tenant_isolation_traces_v1 ON traces_v1
+CREATE ROW POLICY IF NOT EXISTS tenant_isolation_traces_v1 ON traces_v1
     USING tenant_id = getSetting('custom_tenant_id')
     TO openaiops;

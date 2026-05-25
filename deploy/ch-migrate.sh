@@ -2,6 +2,14 @@
 # ClickHouse forward-only migration runner. See docs/decisions/0002-clickhouse-schema-migrations.md.
 set -eu
 
+# Reject DB names that aren't safe to interpolate into raw SQL.
+case "${CH_DATABASE:-openaiops}" in
+    *[!A-Za-z0-9_]* | "")
+        echo "[ch-migrate] FATAL: CH_DATABASE must match [A-Za-z0-9_]+" >&2
+        exit 1
+        ;;
+esac
+
 CH_HOST="${CH_HOST:-clickhouse}"
 CH_PORT="${CH_PORT:-9000}"
 CH_USER="${CH_USER:-openaiops}"
@@ -75,8 +83,26 @@ for f in $(find "$MIG_DIR" -maxdepth 1 -name '*.sql' -type f 2>/dev/null | sort)
         continue
     fi
     echo "[ch-migrate] apply  $version"
-    ch --multiquery --queries-file "$f"
-    ch --query "INSERT INTO _schema_migrations (version) VALUES ('$version')"
+    # Atomic apply+record: send the migration body and the tracking-row insert
+    # in a single ClickHouse RPC over stdin. If we crash between the two,
+    # we'd brick the runner on the next run (replay → "already exists").
+    # Strip trailing whitespace and any trailing ';'s from the body so we can
+    # re-add exactly one ';' before appending the INSERT statement.
+    {
+        awk '
+            { lines[NR] = $0 }
+            END {
+                # Concatenate all lines back, then trim trailing whitespace + ;.
+                out = ""
+                for (i = 1; i <= NR; i++) {
+                    out = out (i > 1 ? "\n" : "") lines[i]
+                }
+                sub(/[[:space:];]+$/, "", out)
+                printf "%s", out
+            }
+        ' "$f"
+        printf ';\nINSERT INTO _schema_migrations (version) VALUES ('"'"'%s'"'"');\n' "$version"
+    } | ch --multiquery
     applied_count=$((applied_count + 1))
 done
 
