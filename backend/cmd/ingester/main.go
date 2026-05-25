@@ -99,11 +99,13 @@ func run(logger *slog.Logger) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
-		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
-	}
+	// Drain real traffic first — OTLP receiver before admin so /healthz keeps
+	// answering until the receiver has stopped accepting batches.
 	if rcvrErr := rcvr.Shutdown(ctx); rcvrErr != nil && runErr == nil {
 		runErr = fmt.Errorf("otlp receiver shutdown: %w", rcvrErr)
+	}
+	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
+		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
 	}
 	logger.Info("ingester shutdown complete")
 	return runErr
