@@ -57,7 +57,9 @@ func run(logger *slog.Logger) error {
 	resolver := auth.NewPGResolver(db)
 
 	metrics := ingest.NewMetrics(prometheus.DefaultRegisterer)
-	consumer := ingest.NewConsumer(resolver, ch, nil, metrics)
+	metering := ingest.NewMetering(db, metrics)
+	defer metering.Close()
+	consumer := ingest.NewConsumer(resolver, ch, metering, metrics)
 	rcvr, err := ingest.NewOTLPReceiver(ingest.ReceiverConfig{
 		GRPCAddr: cfg.IngesterOTLPGRPCAddr,
 		HTTPAddr: cfg.IngesterOTLPHTTPAddr,
@@ -105,6 +107,9 @@ func run(logger *slog.Logger) error {
 	if rcvrErr := rcvr.Shutdown(ctx); rcvrErr != nil && runErr == nil {
 		runErr = fmt.Errorf("otlp receiver shutdown: %w", rcvrErr)
 	}
+	// Receiver stopped → no new metering events. Flush whatever is pending in
+	// the queue before tearing down admin + PG/CH connections.
+	metering.Drain()
 	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
 		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
 	}
