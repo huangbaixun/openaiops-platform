@@ -1,26 +1,22 @@
 {
   "schema_version": "1.0",
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
-  "updated_at": "2026-05-25",
+  "updated_at": "2026-05-26",
   "active_branch": "main",
-  "current_focus": "SLICE-1 spec landed 2026-05-25 (docs/specs/2026-05-25-slice-1-trace-design.md). Brainstorming locked 6 open choices: Bearer-on-receiver tenant trust + ingester-as-OTLP-receiver (Collector out of data path) + extend chquery.Conn.PrepareBatch with *chquery.Batch wrapper (closes SLICE-1-PREP-1 by design) + AC #2 schema + resource_attributes Map, skip events/links + telemetrygen for CI + hot-r.o.d. for demo + UI scope list+waterfall+JSON only (Service Map subtab deferred to SLICE-3). AC #1/#3/#7/#9 evolved and locked into features.json. Next: /harness:writing-plans for docs/plans/2026-05-25-slice-1-plan.md.",
-  "open_tasks": [
-    {
-      "id": "SLICE-1-PREP-1",
-      "title": "chquery.Conn batch-insert support before SLICE-1 ingester",
-      "priority": "P0",
-      "blocks": "SLICE-1 ingester (high-throughput trace writes)",
-      "status": "resolved-by-design 2026-05-25",
-      "resolution_spec": "docs/specs/2026-05-25-slice-1-trace-design.md §4",
-      "notes": "Brainstorming chose Option A (extend chquery.Conn with PrepareBatch + *chquery.Batch wrapper) over lint exception or typed adapter. Implementation lands as part of SLICE-1 plan T2 (chquery.Batch); keep this task open until code merges, then move to resolved_questions."
-    }
-  ],
+  "current_focus": "SLICE-1 complete (16 tasks, 27 commits, all 10 ACs verified). Stack runs end-to-end: hot-r.o.d. → ingester → CH → query → Vue /traces. Cross-tenant E2E test gates AC #8 with 8 sub-assertions (6 AC + 2 HTTP-transport regression). Three real bugs caught during execution: ingester IncludeMetadata missing on both transports (fixed T10+T13); migration replay-safety via IF NOT EXISTS (fixed T1); frontend nginx not mirroring Caddy /api/v1/traces split (fixed T16). Two product-drift items deferred to SLICE-2 prep: list ts upper-bound rounding (drift D1) and seed-traces port auto-discovery (drift D3). Next: SLICE-2 (log ingest) brainstorming — same Bearer-on-receiver pattern, may converge log + trace ingester to one binary.",
+  "open_tasks": [],
   "recently_completed": [
     {
       "date": "2026-05-24",
       "name": "Slice 0 (Foundation) — full delivery",
       "summary": "Bootstrap → Go backend (1.25, chi v5, pgx v5, goose v3) → PG schema (tenants/api_keys/metering_events) → bcrypt + tenant domain types → ApiKey pgx repo (dockertest integration tests) → auth Bearer middleware (ctx.tenant_id injection) → PG resolver + chi gateway server + /healthz → docker-compose stack (PG+Redis+CH+OTel-Collector+Caddy+gateway+frontend, 8080/4317/4318 env-overridable for SignOz collision) → Vue 3 + Vite + Pinia + Naive UI scaffold → openapm design tokens → vue-i18n (zh-CN/en-US) + auth store (TDD) + Vue Router with guard + LoginView + HomeView + AppLayout + TopBar + SideBar → frontend Dockerfile + nginx (with critical /api proxy) + Caddy reverse-proxy → Playwright E2E (4 specs incl. two-tenant cross-context) + GitHub Actions CI (3 jobs: backend / frontend-unit / e2e). CI green 6m32s on run 26359958968. 8/8 ACs verified (AC-7 partial). 14 implementer + 11 reviewer + 2 fixer subagent dispatches over ~3h.",
       "evidence": "features.json SLICE-0.evidence + deploy/AC-evidence.txt"
+    },
+    {
+      "date": "2026-05-26",
+      "name": "SLICE-1 — Trace ingest end-to-end",
+      "summary": "telemetrygen / hot-r.o.d. → cmd/ingester (OTel otlpreceiver embed, Bearer-on-receiver auth, drops SDK tenant.id) → CH traces_v1 with Row Policy → cmd/query :8081 list+detail → Vue /traces with hand-rolled SVG waterfall. 16 tasks, ~27 commits (incl. review-driven fixes). 8/10 ACs verified by automated tests; AC #2 + AC #6 verified by migrate-ch-up stdout + system.row_policies; AC #7 verified by Playwright. Three real bugs caught: ingester IncludeMetadata missing on both gRPC and HTTP transports; CH migration replay-safety required IF NOT EXISTS on both DDLs; frontend nginx only proxied /api/* to gateway (caught by T16 Playwright when SPA-side /api/v1/traces returned 404 — fixed by mirroring Caddy's split into nginx.conf). New shared chtest package landed under internal/chquery/chtest for future integration tests.",
+      "evidence": "deploy/SLICE-1-evidence.txt + commits 0fb9a97..<T16 SHA>"
     }
   ],
   "notes": [
@@ -38,6 +34,11 @@
       "date": "2026-05-24",
       "kind": "lesson",
       "note": "PRE-3 Task 4 surfaced a clickhouse-go/v2 protocol quirk: per-query Settings sent over the native protocol default to is_important=true, which CH validates against builtin-settings only. Custom names (custom_*) MUST be wrapped in clickhouse.CustomSetting{Value: ...} to flip the flag to 0x02. Also: CH 23.12 server requires custom_settings_prefixes config to allow the custom_ prefix at all. Without BOTH pieces, layer 2 of ADR-0001 §3.3 silently fails — code looks correct, but Row Policy never sees the setting."
+    },
+    {
+      "date": "2026-05-26",
+      "kind": "lesson",
+      "note": "SLICE-1 T16 caught a Slice-0 regression: frontend nginx.conf only forwards /api/* → gateway. Once a second query backend appeared at :8081 (cmd/query), the SPA on the frontend host port could not reach it — /api/v1/traces returned nginx 404. Caddy at 443 had the split but nginx at 13000 (frontend host) did not. Fix duplicates the rule in two places, which is fragile. SLICE-2 should either consolidate routing into one component or eliminate the nginx hop entirely. Tracked as drift D4."
     }
   ],
   "known_drift": [
@@ -58,6 +59,24 @@
       "item": "migrate service in docker-compose installs goose via go install at every compose-up. Network-dependent + slow cold start. Switch to ghcr.io/pressly/goose image or pre-bake into Dockerfile.",
       "severity": "low",
       "tracked_in": "lessons-learned D2"
+    },
+    {
+      "date": "2026-05-26",
+      "item": "List ts upper-bound uses `time.Now().UTC()` with strict `ts < ?`. clickhouse-go Time-param rounding excludes spans written within ~1s of 'now'. UI list refresh in first second after ingest = empty. Workaround: SLICE-2 should add a small lookahead (e.g., now + 1s) or switch to `ts <=` semantics.",
+      "severity": "low",
+      "tracked_in": "SLICE-1 T13 implementer note + SLICE-1-evidence.txt D1"
+    },
+    {
+      "date": "2026-05-26",
+      "item": "cmd/seed-traces honors INGESTER_OTLP_GRPC_HOST_PORT but doesn't auto-discover. Manual --target flag is the workaround.",
+      "severity": "low",
+      "tracked_in": "SLICE-1-evidence.txt D3"
+    },
+    {
+      "date": "2026-05-26",
+      "item": "Routing for /api/v1/traces* is duplicated in deploy/Caddyfile (443 ingress) and frontend/nginx.conf (frontend host port). Adding a new query-side route (logs, services, topology in later slices) requires updating both — fragile. SLICE-2 should either consolidate routing into a single component or remove the nginx hop entirely.",
+      "severity": "medium",
+      "tracked_in": "SLICE-1-evidence.txt D4"
     }
   ],
   "open_questions": [
@@ -87,6 +106,11 @@
       "date": "2026-05-24",
       "q": "PRE-3: how to implement MustTenantScope + Row Policy + lint?",
       "decision": "Three-layer defense landed per plan docs/plans/2026-05-24-pre-3-must-tenant-scope-plan.md. Layer 1: chquery.MustTenantScope helper validates 'tenant_id = ?' (SELECT) or '(tenant_id,' (INSERT) shape + panics on missing tenant. Layer 2: chquery.Conn wraps clickhouse-go/v2 driver and injects custom_tenant_id session setting via clickhouse.CustomSetting{} wrapper (discovered during smoke testing — raw values get rejected as builtin-setting). CH server must have custom_settings_prefixes=custom_ config (deploy/clickhouse-custom-settings.xml bind-mounted in compose). CH Row Policy template provided in backend/ch-migrations/README.md for SLICE-1 migrations. Layer 3: cross-tenant reverse E2E is SLICE-1 AC #8 (needs traces_v1 table first). Build-time lint deploy/lint-no-bare-ch.sh + make lint-ch + CI step forbids bare clickhouse-go imports outside internal/chquery. 7 commits 80344d7..ce7ed1b. Dockertest smoke (TestSmoke_TenantIsolation) validates layer 1+2 against real CH 23.12."
+    },
+    {
+      "date": "2026-05-26",
+      "q": "SLICE-1-PREP-1: chquery.Conn batch-insert support",
+      "decision": "Resolved by extending chquery.Conn.PrepareBatch with a *chquery.Batch wrapper (commit 1a00986). Tenant_id pinned at PrepareBatch time and verified on each Append; CH Row Policy is layer-2 backstop. Smoke test TestSmoke_BatchTenantIsolation proves tenant-A-writes / tenant-B-reads = 0."
     }
   ]
 }

@@ -1,0 +1,129 @@
+# SLICE-1 AC evidence — captured 2026-05-26
+
+## Tasks delivered
+
+T1 — CH traces_v1 + Row Policy migration (commits 0fb9a97, aef6c98, c669ae7)
+T2 — chquery.Batch wrapper, closes SLICE-1-PREP-1 (1a00986, 1f38262)
+T3 — cmd/ingester scaffold + 3-binary config (58952b8, 1a6c743)
+T4 — OTel otlpreceiver embed (2a442f9, c9676bd, 5306553)
+T5 — Bearer auth + spans→rows + CH PrepareBatch (2328cf7, 10a8d3a)
+T6 — best-effort async PG metering (36d8388, 115d461)
+T7 — cmd/query scaffold (70a353f)
+T8 — traces list endpoint + chquery/chtest fixture package (3076f61, 37952a1)
+T9 — traces detail endpoint (a8a1661)
+T10 — docker-compose + Caddy + Dockerfile rework (df3e870, 1a0e962, 71b3d51)
+T11 — frontend /traces list (0aaeb39)
+T12 — frontend /traces/:id detail + SVG waterfall (7af369e)
+T13 — cross-tenant Go integration test, AC #8 gate (2e59b2f)
+T14 — CI matrix split + integration tags (0e4143f)
+T15 — cmd/seed-traces helper (e77437a)
+T16 — Playwright e2e + this evidence + closeout (THIS COMMIT)
+
+## AC coverage
+
+AC #1 — Bearer-on-receiver + drop SDK tenant.id + 401 counters
+  Evidence: backend/internal/ingest/spans_test.go TestSpansToRows_DropsTenantIDResourceAttr,
+            cross_tenant_test.go sub-tests "no bearer → 401" and "garbage bearer → 401",
+            cross_tenant_test.go sub-test "OTLP/HTTP missing bearer → 401" locks in
+            the IncludeMetadata regression for both gRPC and HTTP transports.
+
+AC #2 — CH traces_v1 schema + Row Policy
+  Evidence: backend/ch-migrations/20260525120000_create_traces_v1.sql; migrate-ch-up
+            stdout (apply + idempotent skip + replay after _schema_migrations clear).
+  Row Policy attached: `SELECT name, table FROM system.row_policies WHERE table = 'traces_v1'`
+  → tenant_isolation_traces_v1 ON openaiops.traces_v1 | traces_v1
+
+AC #3 — ingester is itself the OTLP receiver; tenant_id server-stamped
+  Evidence: deploy/docker-compose.yml has NO otel-collector service (deleted in T10).
+            ingester service listens on :4317 (gRPC) + :4318 (HTTP) + :8082 (admin).
+            backend/internal/ingest/consume.go server-stamps tn.ID after PGResolver.
+
+AC #4 — cmd/query :8081, list + detail behind Caddy /api/v1/traces*
+  Evidence: curl -sk -H "Authorization: Bearer test-key-acme" https://localhost/api/v1/traces
+  → {"items":[3 traces, span_count=5 each], "has_more":false}
+  curl -sk … /api/v1/traces/01000000000000000000000000000000 → {"trace_id":"…","spans":[5 spans]}
+  Caddy `handle /api/v1/traces*` → query:8081, `handle /api/*` → gateway:8080
+  (deploy/Caddyfile L11-L20). Frontend nginx mirrors the split (T16 review fix —
+  see drift D4 below).
+
+AC #5 — all Query API SQL through chquery.Conn; lint-ch covers new dirs
+  Evidence: `make lint-ch` → `lint-no-bare-ch: OK (backend/internal/query
+            backend/internal/ingest backend/cmd clean)`.
+
+AC #6 — Row Policy enforces at CH (defense-in-depth)
+  Evidence: backend/internal/chquery/conn_smoke_test.go TestSmoke_BatchTenantIsolation
+            (tenant A writes 2, tenant B reads 0). Plus
+            backend/internal/query/traces_repo_test.go TestRepo_Detail_CrossTenantBlocked
+            (tenant B sees 0 spans for tenant A's trace_id).
+            Live confirmation: `clickhouse-client --query "SELECT count() FROM
+            openaiops.traces_v1"` (no custom_tenant_id setting) returns:
+            `Code: 115. DB::Exception: Unknown setting custom_tenant_id` — Row
+            Policy is active and CH refuses non-tenant-scoped reads.
+
+AC #7 — Vue /traces page (list + waterfall + JSON + Service Map placeholder)
+  Evidence: frontend/src/views/Traces/{TracesList,TraceDetail,WaterfallChart}.vue.
+            Playwright frontend/e2e/traces.spec.ts: 4 specs PASS in 3.0s
+              ✓ acme: traces list renders + clicking row goes to detail with waterfall
+              ✓ JSON tab shows raw payload
+              ✓ Service Map tab shows coming-soon placeholder
+              ✓ beta: empty list (cross-tenant UX, no leakage)
+
+AC #8 — Cross-tenant Go integration test, 6 sub-assertions
+  Evidence: backend/internal/ingest/cross_tenant_test.go TestSlice1_CrossTenantIsolation,
+            8 sub-tests PASS (6 AC + 2 HTTP-transport regression):
+              acme sees own traces (list)
+              acme sees own span count (detail)
+              beta sees zero traces (list)
+              beta gets 404 on acme trace_id (detail)
+              no bearer → 401
+              garbage bearer → 401
+              OTLP/HTTP delivers spans with valid bearer (T10 IncludeMetadata regression)
+              OTLP/HTTP missing bearer → 401 (must not silently 200)
+
+AC #9 — per-batch metering, best-effort
+  Evidence: backend/internal/ingest/metering.go (channel-buffered, ctx-bounded Drain,
+            both failure modes increment ingester_metering_failed_total).
+            metering_test.go covers happy-path + queue-full + PG-error.
+
+AC #10 — CI matrix: backend-unit + backend-integration + frontend-unit + e2e + lint-ch
+  Evidence: .github/workflows/ci.yml has 4 jobs. backend-unit runs `go test ./...`
+            (no Docker required after T14 build-tag cleanup). backend-integration runs
+            `-tags=integration`. e2e depends on all three preceding jobs and includes
+            `make seed-traces` between PG seed and Playwright.
+
+## Verification command summary (2026-05-26 session)
+
+  $ make test-go-integration        → all packages ok (apikey 5.3s, auth 4.5s,
+                                       chquery 3.3s, ingest 5.8s, query 2.9s)
+  $ cd frontend && npm run build    → built in 244ms, dist OK
+  $ cd frontend && npx vitest run   → 3 test files, 6 tests PASS in 1.14s
+  $ cd frontend && npx playwright test e2e/traces.spec.ts
+                                    → 4 passed (3.0s)
+  $ make lint-ch                    → lint-no-bare-ch: OK
+
+## Known drift / open follow-ups (do NOT block SLICE-1 done)
+
+D1 — `parseListParams` builds the ts upper bound as `time.Now().UTC()` with strict
+     `ts < ?`. clickhouse-go can round Time params such that spans written within
+     ~1s of "now" are excluded from a default-window list. Surfaced during T13.
+     User-visible symptom: refresh the UI within the first second after ingest
+     and the list is empty.
+
+D2 — `_schema_migrations` re-running after replay is now safe (T1 review fix added
+     `CREATE TABLE IF NOT EXISTS` + `CREATE ROW POLICY IF NOT EXISTS`). Future CH
+     migrations must also use `IF NOT EXISTS` on every DDL — enforce in spec review.
+
+D3 — `cmd/seed-traces` honors `INGESTER_OTLP_GRPC_HOST_PORT` for local SignOz
+     collision but does not auto-discover. CI uses default :4317. If someone runs
+     `make seed-traces` against a non-default-port stack without the env var, it
+     silently 401s. Low impact; an explicit `--target` flag is the workaround.
+
+D4 — frontend/nginx.conf only proxied `/api/*` to gateway. Caddy split was
+     mirrored only at the 443 ingress, so the SPA loaded from the frontend host
+     port (13000 locally) could not reach query:8081 — `/api/v1/traces*` returned
+     404. Caught by T16 Playwright run. Fix: added a `location /api/v1/traces`
+     block in nginx.conf with `proxy_pass http://query:8081/v1/traces;` that wins
+     over the generic `/api/` location. Future query-side routes (logs, services,
+     topology) will need the same dual-write in both Caddyfile and nginx.conf —
+     candidate for SLICE-2 consolidation (single config source or eliminate the
+     nginx hop entirely).
