@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -27,17 +28,37 @@ func (f *fakePG) ExecContext(_ context.Context, _ string, args ...any) (sql.Resu
 
 func TestMetering_EnqueueDrain(t *testing.T) {
 	pg := &fakePG{}
-	m := NewMetering(pg, NewMetrics(prometheus.NewRegistry()))
-	defer m.Close()
+	m := newMeteringWithCap(pg, NewMetrics(prometheus.NewRegistry()), 4)
+	// No Close() — no loop goroutine to cancel.
 
 	m.Enqueue(uuid.MustParse("11111111-1111-1111-1111-111111111111"), 7)
-	m.Drain()
+	m.Drain(context.Background())
 
 	if len(pg.inserts) != 1 {
 		t.Fatalf("inserts = %d, want 1", len(pg.inserts))
 	}
 	if pg.inserts[0].count != 7 {
 		t.Fatalf("count = %d, want 7", pg.inserts[0].count)
+	}
+}
+
+type fakePGErr struct{}
+
+func (fakePGErr) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, errors.New("pg down")
+}
+
+func TestMetering_PGErrorIncrementsFailedCounter(t *testing.T) {
+	metrics := NewMetrics(prometheus.NewRegistry())
+	// Use the no-goroutine constructor so Drain is the only consumer.
+	m := newMeteringWithCap(fakePGErr{}, metrics, 4)
+	// No Close() needed — no goroutine to wait on.
+
+	m.Enqueue(uuid.MustParse("11111111-1111-1111-1111-111111111111"), 5)
+	m.Drain(context.Background())
+
+	if got := testCounterValue(t, metrics.MeteringFailed); got != 1 {
+		t.Fatalf("MeteringFailed = %v, want 1", got)
 	}
 }
 

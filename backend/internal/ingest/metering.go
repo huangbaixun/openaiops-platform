@@ -72,13 +72,13 @@ func (m *Metering) loop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ev := <-m.ch:
-			m.write(ev)
+			m.write(ctx, ev)
 		}
 	}
 }
 
-func (m *Metering) write(ev meteringEvent) {
-	_, err := m.pg.ExecContext(context.Background(),
+func (m *Metering) write(ctx context.Context, ev meteringEvent) {
+	_, err := m.pg.ExecContext(ctx,
 		`INSERT INTO metering_events (tenant_id, signal_type, count) VALUES ($1, $2, $3)`,
 		ev.tid, "trace", ev.count)
 	if err != nil {
@@ -87,13 +87,19 @@ func (m *Metering) write(ev meteringEvent) {
 	}
 }
 
-// Drain processes pending events synchronously. Safe to call after Close.
-// Used in tests and during shutdown when we want best-effort flush.
-func (m *Metering) Drain() {
+// Drain processes pending events synchronously, bounded by ctx. If ctx
+// is cancelled mid-drain, remaining events are not written; the caller
+// is responsible for choosing a reasonable shutdown deadline.
+func (m *Metering) Drain(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		select {
 		case ev := <-m.ch:
-			m.write(ev)
+			m.write(ctx, ev)
 		default:
 			return
 		}

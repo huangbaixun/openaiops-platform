@@ -109,7 +109,7 @@ func run(logger *slog.Logger) error {
 	}
 	// Receiver stopped → no new metering events. Flush whatever is pending in
 	// the queue before tearing down admin + PG/CH connections.
-	metering.Drain()
+	metering.Drain(ctx) // reuses the 30s shutdown context already defined above
 	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
 		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
 	}
