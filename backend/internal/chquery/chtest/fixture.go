@@ -132,6 +132,12 @@ func StartCH(t FatalReporter, migrationNames ...string) *Fixture {
 				_ = pool.Purge(res)
 				t.Fatalf("chtest: read migration %s: %s", name, err)
 			}
+			// applyMigration splits the SQL file on ";\n" and runs each statement
+			// individually. CONSTRAINT: migration authors MUST use LF line endings
+			// (not CRLF) and MUST NOT include a bare ";\n" sequence inside a
+			// statement body (e.g., in a multi-line comment or string literal).
+			// If a future migration needs that, switch to the CH HTTP batch endpoint
+			// or a real SQL tokenizer.
 			for _, stmt := range strings.Split(string(sqlBytes), ";\n") {
 				stmt = strings.TrimSpace(stmt)
 				if stmt == "" || allCommentLines(stmt) {

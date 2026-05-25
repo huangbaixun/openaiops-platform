@@ -80,7 +80,7 @@ func (r *TracesRepo) List(ctx context.Context, p ListParams) ([]TraceListItem, b
 	}
 	defer rows.Close()
 
-	var items []TraceListItem
+	items := make([]TraceListItem, 0)
 	for rows.Next() {
 		var it TraceListItem
 		if err := rows.Scan(&it.TraceID, &it.RootService, &it.RootOperation,

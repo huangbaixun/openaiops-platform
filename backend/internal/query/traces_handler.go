@@ -54,6 +54,9 @@ func parseListParams(r *http.Request) (ListParams, error) {
 		if err != nil {
 			return p, err
 		}
+		if f < 0 {
+			f = 0
+		}
 		p.MinDurationMs = f
 	}
 	if v := q.Get("limit"); v != "" {
