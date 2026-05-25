@@ -13,7 +13,6 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"go.opentelemetry.io/collector/component/componenttest"
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
@@ -64,7 +63,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("otlp receiver build: %w", err)
 	}
-	if err := rcvr.Start(context.Background(), componenttest.NewNopHost()); err != nil {
+	if err := rcvr.Start(context.Background(), ingest.NewHost()); err != nil {
 		return fmt.Errorf("otlp receiver start: %w", err)
 	}
 	logger.Info("ingester otlp listening", "grpc", cfg.IngesterOTLPGRPCAddr, "http", cfg.IngesterOTLPHTTPAddr)

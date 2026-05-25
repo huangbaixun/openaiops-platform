@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/config/configgrpc"
 	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/config/configoptional"
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/otlpreceiver"
+	noopMeter "go.opentelemetry.io/otel/metric/noop"
+	"go.opentelemetry.io/otel/trace/noop"
+	"go.uber.org/zap"
 )
 
 // ReceiverConfig captures the four load-bearing knobs for the OTLP receiver
@@ -50,9 +52,14 @@ func NewOTLPReceiver(cfg ReceiverConfig, c *Consumer) (receiver.Traces, error) {
 		TracesURLPath: "/v1/traces",
 	})
 
+	telSet := component.TelemetrySettings{
+		Logger:         zap.NewNop(),
+		TracerProvider: noop.NewTracerProvider(),
+		MeterProvider:  noopMeter.NewMeterProvider(),
+	}
 	set := receiver.Settings{
 		ID:                component.NewID(component.MustNewType("otlp")),
-		TelemetrySettings: componenttest.NewNopTelemetrySettings(),
+		TelemetrySettings: telSet,
 		BuildInfo:         component.NewDefaultBuildInfo(),
 	}
 	return factory.CreateTraces(context.Background(), set, rcvrCfg, c)
