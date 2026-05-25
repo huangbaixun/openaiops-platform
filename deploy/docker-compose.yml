@@ -29,6 +29,12 @@ services:
       CLICKHOUSE_USER: openaiops
       CLICKHOUSE_PASSWORD: openaiops
       CLICKHOUSE_DB: openaiops
+      # Required so the openaiops user can manage Row Policies (multi-tenant
+      # defense-in-depth — ADR-0001 §3.3). Without this, every CH migration
+      # that attaches a Row Policy fails with ACCESS_DENIED. The chquery
+      # smoke test (backend/internal/chquery/conn_smoke_test.go) sets the
+      # same flag for the same reason.
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ulimits:
       nofile: { soft: 262144, hard: 262144 }
     volumes:

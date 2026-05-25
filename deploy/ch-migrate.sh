@@ -18,20 +18,35 @@ ch() {
         "$@"
 }
 
+# Connect to the "default" DB for readiness + bootstrap CREATE DATABASE.
+# The 23.12-alpine entrypoint's CLICKHOUSE_DB init is unreliable (its
+# DATABASE_ALREADY_EXISTS / RUN_INITDB_SCRIPTS branch inverts on a fresh
+# volume — same workaround used by chquery's smoke test).
+ch_default() {
+    clickhouse-client \
+        --host "$CH_HOST" --port "$CH_PORT" \
+        --user "$CH_USER" --password "$CH_PASSWORD" \
+        --database default \
+        "$@"
+}
+
 echo "[ch-migrate] waiting for clickhouse @ $CH_HOST:$CH_PORT (up to ${WAIT_SECS}s)..."
 i=0
 while [ "$i" -lt "$WAIT_SECS" ]; do
-    if ch --query "SELECT 1" >/dev/null 2>&1; then
+    if ch_default --query "SELECT 1" >/dev/null 2>&1; then
         echo "[ch-migrate] clickhouse ready"
         break
     fi
     i=$((i + 1))
     sleep 1
 done
-if ! ch --query "SELECT 1" >/dev/null 2>&1; then
+if ! ch_default --query "SELECT 1" >/dev/null 2>&1; then
     echo "[ch-migrate] FATAL: clickhouse not reachable after ${WAIT_SECS}s" >&2
     exit 1
 fi
+
+# Ensure target database exists before any per-DB query runs.
+ch_default --query "CREATE DATABASE IF NOT EXISTS $CH_DATABASE"
 
 ch --query "
 CREATE TABLE IF NOT EXISTS _schema_migrations (
