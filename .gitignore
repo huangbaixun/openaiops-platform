@@ -1,5 +1,7 @@
 # Go
 /backend/gateway
+/backend/query
+/backend/ingester
 /backend/*.test
 /backend/coverage.out
 /backend/coverage.html
