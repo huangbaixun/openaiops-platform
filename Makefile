@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up seed-traces demo-traces
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -63,3 +63,16 @@ migrate-down:
 # See docs/decisions/0002-clickhouse-schema-migrations.md.
 migrate-ch-up:
 	docker-compose -f deploy/docker-compose.yml run --rm ch-migrate
+
+# Seed deterministic trace data into the running ingester (used by CI e2e + manual sanity).
+# Honors INGESTER_OTLP_GRPC_HOST_PORT for local SignOz collision override.
+seed-traces:
+	cd backend && go run ./cmd/seed-traces \
+		--target=localhost:$${INGESTER_OTLP_GRPC_HOST_PORT:-4317} \
+		--tenant-key=test-key-acme \
+		--spans=5 \
+		--traces=3
+
+# Start the hot-r.o.d. demo service that streams lifelike business traffic into the ingester.
+demo-traces:
+	docker compose -f deploy/docker-compose.yml --profile demo up -d hot-r-o-d
