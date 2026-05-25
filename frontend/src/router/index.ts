@@ -11,6 +11,17 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         { path: '', name: 'home', component: () => import('../views/HomeView.vue') },
+        {
+          path: 'traces',
+          name: 'traces',
+          component: () => import('../views/Traces/TracesList.vue'),
+        },
+        {
+          path: 'traces/:traceId',
+          name: 'trace-detail',
+          component: () => import('../views/Traces/TraceDetail.vue'),
+          props: true,
+        },
       ],
     },
   ],
