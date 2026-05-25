@@ -55,7 +55,8 @@ func run(logger *slog.Logger) error {
 
 	resolver := auth.NewPGResolver(db)
 
-	consumer := ingest.NewConsumer()
+	metrics := ingest.NewMetrics()
+	consumer := ingest.NewConsumer(resolver, ch, nil, metrics)
 	rcvr, err := ingest.NewOTLPReceiver(ingest.ReceiverConfig{
 		GRPCAddr: cfg.IngesterOTLPGRPCAddr,
 		HTTPAddr: cfg.IngesterOTLPHTTPAddr,
@@ -67,7 +68,6 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("otlp receiver start: %w", err)
 	}
 	logger.Info("ingester otlp listening", "grpc", cfg.IngesterOTLPGRPCAddr, "http", cfg.IngesterOTLPHTTPAddr)
-	_ = resolver // wired into the consumer in Task 5
 
 	// Admin server.
 	adminSrv := &http.Server{
