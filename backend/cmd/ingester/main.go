@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,32 +23,33 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
-
-	cfg, err := config.FromEnv()
-	if err != nil {
-		logger.Error("config", "err", err)
+	if err := run(logger); err != nil {
+		logger.Error("ingester", "err", err)
 		os.Exit(1)
 	}
+}
+
+func run(logger *slog.Logger) error {
+	cfg, err := config.FromEnv()
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
 	if cfg.ClickHouseDSN == "" {
-		logger.Error("CLICKHOUSE_DSN is required for ingester")
-		os.Exit(1)
+		return errors.New("CLICKHOUSE_DSN is required for ingester")
 	}
 
 	db, err := sql.Open("pgx", cfg.DatabaseURL)
 	if err != nil {
-		logger.Error("pg open", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("pg open: %w", err)
 	}
 	defer db.Close()
 	if err := db.PingContext(context.Background()); err != nil {
-		logger.Error("pg ping", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("pg ping: %w", err)
 	}
 
 	ch, err := chquery.Connect(context.Background(), cfg.ClickHouseDSN)
 	if err != nil {
-		logger.Error("ch connect", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("ch connect: %w", err)
 	}
 	defer ch.Close()
 
@@ -59,20 +62,33 @@ func main() {
 		Handler:           ingest.AdminHandler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+
+	// Run admin server; surface a startup failure back to main so deferred
+	// Close() calls (PG, CH) run on the way out.
+	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("ingester admin listening", "addr", cfg.IngesterAdminAddr)
 		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("admin listen", "err", err)
-			os.Exit(1)
+			errCh <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+
+	var runErr error
+	select {
+	case <-quit:
+		logger.Info("ingester shutting down on signal")
+	case err := <-errCh:
+		runErr = fmt.Errorf("admin listen: %w", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_ = adminSrv.Shutdown(ctx)
+	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
+		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
+	}
 	logger.Info("ingester shutdown complete")
+	return runErr
 }
