@@ -98,3 +98,39 @@ func (r *TracesRepo) List(ctx context.Context, p ListParams) ([]TraceListItem, b
 	}
 	return items, hasMore, nil
 }
+
+const detailSQL = `
+SELECT span_id, parent_span_id, service, operation,
+       ts, duration, status, span_kind,
+       resource_attributes, attributes
+FROM traces_v1
+WHERE tenant_id = ?
+  AND trace_id  = ?
+ORDER BY ts ASC
+`
+
+// Detail returns the flat span list for a trace under the calling tenant.
+// Empty slice (NOT nil) when the trace has no rows under this tenant.
+// The handler maps empty to HTTP 404.
+func (r *TracesRepo) Detail(ctx context.Context, traceID string) ([]SpanDetail, error) {
+	rows, err := r.ch.Query(ctx, detailSQL, traceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	spans := make([]SpanDetail, 0)
+	for rows.Next() {
+		var s SpanDetail
+		if err := rows.Scan(&s.SpanID, &s.ParentSpanID, &s.Service, &s.Operation,
+			&s.Ts, &s.DurationNs, &s.Status, &s.SpanKind,
+			&s.ResourceAttributes, &s.Attributes); err != nil {
+			return nil, err
+		}
+		spans = append(spans, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return spans, nil
+}

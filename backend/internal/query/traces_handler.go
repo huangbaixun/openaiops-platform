@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
 )
 
@@ -109,6 +111,21 @@ func (h *TracesHandler) List(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(TraceListResponse{Items: items, HasMore: hasMore})
 }
 
-func (h *TracesHandler) Detail(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented) // Task 9
+func (h *TracesHandler) Detail(w http.ResponseWriter, r *http.Request) {
+	traceID := chi.URLParam(r, "trace_id")
+	if traceID == "" {
+		http.Error(w, "missing trace_id", http.StatusBadRequest)
+		return
+	}
+	spans, err := h.repo.Detail(r.Context(), traceID)
+	if err != nil {
+		http.Error(w, "internal", http.StatusInternalServerError)
+		return
+	}
+	if len(spans) == 0 {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(TraceDetailResponse{TraceID: traceID, Spans: spans})
 }

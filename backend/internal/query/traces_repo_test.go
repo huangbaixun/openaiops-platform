@@ -61,3 +61,47 @@ func TestRepo_List_HasMore(t *testing.T) {
 	require.True(t, hasMore, "5 traces with limit=3 must report has_more=true")
 	require.Len(t, items, 3)
 }
+
+func TestRepo_Detail_RoundTrip(t *testing.T) {
+	conn := setupCH(t)
+	defer conn.Close()
+
+	tid := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	ctx := auth.WithTenant(context.Background(), tid, "gamma")
+
+	seedSpans(t, conn, ctx, tid, "trace-detail-aaa", 3)
+
+	repo := query.NewTracesRepo(conn)
+	got, err := repo.Detail(ctx, "trace-detail-aaa")
+	require.NoError(t, err)
+	require.Len(t, got, 3, "expected 3 spans for the seeded trace")
+	require.Equal(t, "frontend", got[0].Service)
+
+	// Missing trace returns empty slice (not error). Handler maps to 404.
+	miss, err := repo.Detail(ctx, "does-not-exist")
+	require.NoError(t, err)
+	require.Empty(t, miss)
+}
+
+// Cross-tenant negative: tenant B cannot see tenant A's trace_id.
+func TestRepo_Detail_CrossTenantBlocked(t *testing.T) {
+	conn := setupCH(t)
+	defer conn.Close()
+
+	tidA := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	tidB := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	ctxA := auth.WithTenant(context.Background(), tidA, "tenant-A")
+	ctxB := auth.WithTenant(context.Background(), tidB, "tenant-B")
+
+	seedSpans(t, conn, ctxA, tidA, "trace-secret", 5)
+
+	repo := query.NewTracesRepo(conn)
+	// A sees own
+	a, err := repo.Detail(ctxA, "trace-secret")
+	require.NoError(t, err)
+	require.Len(t, a, 5)
+	// B sees nothing
+	b, err := repo.Detail(ctxB, "trace-secret")
+	require.NoError(t, err)
+	require.Empty(t, b, "tenant B must not see tenant A's trace")
+}

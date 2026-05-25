@@ -71,6 +71,17 @@ func TestParseListParams_InvalidTsFrom_Error(t *testing.T) {
 	}
 }
 
+func TestDetail_MissingTraceID_400(t *testing.T) {
+	h := NewTracesHandler(nil)
+	rec := httptest.NewRecorder()
+	// No chi router → chi.URLParam returns "".
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces/", nil)
+	h.Detail(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
 func TestList_EmptyTenant_ReturnsEmptyArrayNotNull(t *testing.T) {
 	// We can't hit the real repo without a CH, so use a nil-conn-tolerant
 	// test path: parseListParams + manual JSON encode of an empty response.
