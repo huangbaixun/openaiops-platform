@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-fe e2e migrate-up migrate-down migrate-ch-up
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -39,6 +39,9 @@ test: test-go test-fe
 
 test-go:
 	cd backend && go test ./...
+
+test-go-integration:
+	cd backend && go test -tags=integration -count=1 -timeout 240s ./...
 
 test-fe:
 	cd frontend && npm run test

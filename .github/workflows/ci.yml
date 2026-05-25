@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  backend:
+  backend-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,10 +18,19 @@ jobs:
         run: cd backend && go vet ./...
       - name: lint - no bare clickhouse-go imports outside chquery
         run: ./deploy/lint-no-bare-ch.sh
-      - name: go test (unit)
+      - name: go test (unit, no Docker)
         run: cd backend && go test -count=1 -timeout 120s ./...
-      - name: go test (integration — dockertest spins PG)
-        run: cd backend && go test -tags=integration -count=1 -timeout 240s ./internal/auth/...
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+      - name: go mod download
+        run: cd backend && go mod download
+      - name: go test (integration — dockertest spins PG + CH)
+        run: cd backend && go test -tags=integration -count=1 -timeout 240s ./...
 
   frontend-unit:
     runs-on: ubuntu-latest
@@ -38,7 +47,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [backend, frontend-unit]
+    needs: [backend-unit, backend-integration, frontend-unit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -104,6 +113,19 @@ jobs:
         run: |
           cd deploy
           docker compose exec -T postgres psql -U openaiops -d openaiops < seed.sql
+
+      - name: seed traces (in-process OTLP/gRPC against running ingester)
+        run: |
+          # Confirm cmd/seed-traces exists (T15 deliverable). If it doesn't, fail clearly.
+          if [ ! -d backend/cmd/seed-traces ]; then
+            echo "::error::backend/cmd/seed-traces missing — T15 must land before T14 e2e seeding"
+            exit 1
+          fi
+          cd backend && go run ./cmd/seed-traces \
+            --target=localhost:4317 \
+            --tenant-key=test-key-acme \
+            --spans=5 \
+            --traces=3
 
       - name: e2e
         working-directory: frontend
