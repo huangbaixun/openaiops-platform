@@ -210,6 +210,16 @@ func TestSmoke_BatchTenantIsolation(t *testing.T) {
 	require.NoError(t, conn.QueryRow(ctxA,
 		`SELECT count() FROM _chscope_smoke WHERE tenant_id = ?`).Scan(&n))
 	assert.Equal(t, uint64(2), n)
+
+	// Prove the rejected wrong-tenant Append did NOT sneak a row through to tenant B.
+	// Row Policy + Append-validation are layered defenses; this asserts the row-level
+	// visibility check (CLAUDE.md "A writes / B reads → 0" anti-example).
+	ctxB := auth.WithTenant(context.Background(),
+		uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), "tenant-B")
+	var nB uint64
+	require.NoError(t, conn.QueryRow(ctxB,
+		`SELECT count() FROM _chscope_smoke WHERE tenant_id = ?`).Scan(&nB))
+	assert.Equal(t, uint64(0), nB, "tenant B must see 0 rows (Append rejected the wrong-tenant write)")
 }
 
 func TestSmoke_PanicWithoutTenant(t *testing.T) {

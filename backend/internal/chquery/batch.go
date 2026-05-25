@@ -23,12 +23,12 @@ type Batch struct {
 // injects the custom_tenant_id session setting so the Row Policy fires on Send.
 // Panics on missing tenant (programmer error — auth middleware should have set it).
 func (cn *Conn) PrepareBatch(ctx context.Context, query string) (*Batch, error) {
+	if !insertShape.MatchString(query) {
+		return nil, fmt.Errorf("chquery: PrepareBatch query must have '(tenant_id,' as first column: %q", query)
+	}
 	tid, err := auth.TenantID(ctx)
 	if err != nil {
 		panic(fmt.Errorf("chquery: ctx has no tenant_id (auth middleware did not run?): %w", err))
-	}
-	if !insertShape.MatchString(query) {
-		return nil, fmt.Errorf("chquery: PrepareBatch query must have '(tenant_id,' as first column: %q", query)
 	}
 	if cn == nil || cn.c == nil {
 		return nil, errors.New("chquery: nil Conn")
