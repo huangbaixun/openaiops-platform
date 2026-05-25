@@ -48,6 +48,14 @@ func NewOTLPReceiver(cfg ReceiverConfig, c *Consumer) (receiver.Traces, error) {
 				Endpoint:  cfg.HTTPAddr,
 				Transport: confignet.TransportTypeTCP,
 			},
+			// REQUIRED for HTTP auth path. Without IncludeMetadata=true the
+			// confighttp wrapper does NOT copy incoming HTTP headers into
+			// client.Info.Metadata, so extractBearer() in consume.go can't
+			// see the Authorization header and every OTLP/HTTP request 401s
+			// — even when the Bearer is present on the wire. gRPC works
+			// without this flag because gRPC always exposes metadata.
+			// Discovered while wiring the hot-rod demo (T10 review).
+			IncludeMetadata: true,
 		},
 		TracesURLPath: "/v1/traces",
 	})
