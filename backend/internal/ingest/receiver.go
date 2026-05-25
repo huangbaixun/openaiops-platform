@@ -40,6 +40,14 @@ func NewOTLPReceiver(cfg ReceiverConfig, c *Consumer) (receiver.Traces, error) {
 			Endpoint:  cfg.GRPCAddr,
 			Transport: confignet.TransportTypeTCP,
 		},
+		// Same reason as HTTPConfig.IncludeMetadata below: without this
+		// flag the gRPC interceptor (configgrpc.enhanceWithClientInformation)
+		// skips copying incoming metadata into client.Info.Metadata, so
+		// extractBearer() in consume.go cannot see the Authorization
+		// header and every OTLP/gRPC request 401s with "missing bearer".
+		// Discovered by SLICE-1 T13 (AC #8 cross-tenant E2E). The hot-rod
+		// demo masks this because it only emits OTLP/HTTP.
+		IncludeMetadata: true,
 	})
 
 	rcvrCfg.Protocols.HTTP = configoptional.Some(otlpreceiver.HTTPConfig{
