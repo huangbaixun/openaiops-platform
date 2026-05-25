@@ -185,6 +185,33 @@ func TestSmoke_TenantIsolation(t *testing.T) {
 	assert.Equal(t, uint64(2), countB, "tenant B should see exactly 2 rows")
 }
 
+func TestSmoke_BatchTenantIsolation(t *testing.T) {
+	conn, err := chquery.Connect(context.Background(), smokeDSN)
+	require.NoError(t, err)
+	defer conn.Close()
+	setupSmokeTable(t)
+
+	ctxA := auth.WithTenant(context.Background(),
+		uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), "tenant-A")
+
+	batch, err := conn.PrepareBatch(ctxA,
+		`INSERT INTO _chscope_smoke (tenant_id, id, payload) VALUES`)
+	require.NoError(t, err)
+
+	require.NoError(t, batch.Append("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uint32(1), "batch-A-1"))
+	require.NoError(t, batch.Append("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", uint32(2), "batch-A-2"))
+
+	err = batch.Append("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", uint32(3), "should-not-land")
+	require.Error(t, err)
+
+	require.NoError(t, batch.Send())
+
+	var n uint64
+	require.NoError(t, conn.QueryRow(ctxA,
+		`SELECT count() FROM _chscope_smoke WHERE tenant_id = ?`).Scan(&n))
+	assert.Equal(t, uint64(2), n)
+}
+
 func TestSmoke_PanicWithoutTenant(t *testing.T) {
 	conn, err := chquery.Connect(context.Background(), smokeDSN)
 	require.NoError(t, err)
