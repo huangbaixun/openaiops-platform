@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "description": "openaiops-platform feature ledger. Cross-session contract; status transitions are real product gates.",
-  "updated_at": "2026-05-24",
+  "updated_at": "2026-05-25",
   "owner": "@huangbaixun",
   "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
   "history": [
@@ -9,7 +9,8 @@
     {"date": "2026-05-24", "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"},
     {"date": "2026-05-24", "event": "PRE-1 resolved — ADR-0002 chose ch-migrate service (Option B); scaffold landed + smoke verified"},
     {"date": "2026-05-24", "event": "PRE-2 resolved — ADR-0003 chose split cmd/query/ (Option B) under Heavy-soon workload assumption; spec + ADR landed, no code changes yet"},
-    {"date": "2026-05-24", "event": "PRE-3 resolved — chquery package (MustTenantScope helper + Conn wrapper) + Row Policy template + prod CH custom_settings config + build-time lint. SLICE-1 unblocked. 7 commits 80344d7..ce7ed1b."}
+    {"date": "2026-05-24", "event": "PRE-3 resolved — chquery package (MustTenantScope helper + Conn wrapper) + Row Policy template + prod CH custom_settings config + build-time lint. SLICE-1 unblocked. 7 commits 80344d7..ce7ed1b."},
+    {"date": "2026-05-25", "event": "SLICE-1 spec landed (docs/specs/2026-05-25-slice-1-trace-design.md) — brainstormed Bearer-on-receiver tenant trust + ingester-as-OTLP-receiver (Collector out of data path) + chquery.Batch wrapper closing SLICE-1-PREP-1. AC #1/#3/#7/#9 evolved (see acceptance_criteria below). Next: writing-plans for docs/plans/2026-05-25-slice-1-plan.md."}
   ],
   "legend": {
     "priority": "P0=MVP blocker / P1=post-MVP / P2=enhancement",
@@ -69,36 +70,42 @@
     },
     {
       "id": "SLICE-1",
-      "title": "Trace ingest 端到端 — OTel processor + Go ingester + CH traces_v1 + query API + Traces page",
+      "title": "Trace ingest 端到端 — ingester (OTLP receiver) + CH traces_v1 + cmd/query + Traces page",
       "priority": "P0",
       "status": "proposed",
-      "current_state": "Slice 0 stack runs; OTel Collector has only debug exporter; no CH tables; no /api/v1/traces endpoint; frontend Traces page does not exist.",
-      "target_state": "Run OTel demo (hot-r.o.d. or similar) → traces written to CH traces_v1 (tenant-scoped) → curl /api/v1/traces returns waterfall JSON → frontend /traces page renders list + detail with cross-jump to logs (Slice 2). Two tenants verified to not see each others traces (cross-tenant E2E reverse test).",
+      "current_state": "Slice 0 stack runs; no CH tables; no /api/v1/traces endpoint; frontend Traces page does not exist. cmd/query and cmd/ingester binaries do not yet exist. chquery.Conn does not yet expose PrepareBatch (SLICE-1-PREP-1).",
+      "target_state": "telemetrygen / hot-r.o.d. → ingester (OTLP/gRPC :4317 + OTLP/HTTP :4318, Bearer-on-receiver) → CH traces_v1 (tenant-scoped, Row Policy active) → curl /api/v1/traces returns list + waterfall JSON via cmd/query :8081 → frontend /traces page renders list + detail waterfall + JSON. Cross-tenant reverse Go integration test asserts tenant B cannot see tenant A's traces.",
       "acceptance_criteria": [
-        "OTel Collector custom processor (Go) reads tenant.id from OTLP resource attribute or 'X-Tenant-Id' header on HTTP receiver; rejects spans missing tenant.id with 400/dropped + metric",
-        "CH traces_v1 table created (tenant_id LowCardinality(String), trace_id, span_id, parent_span_id, service, operation, ts DateTime64(9), duration UInt64, attributes Map(String,String), status, span_kind); ORDER BY (tenant_id, service, ts) PARTITION BY (tenant_id, toYYYYMMDD(ts))",
-        "Go ingester service: receives OTLP from Collector, writes batches to CH traces_v1, propagates tenant_id from processor",
-        "Query API: GET /api/v1/traces (list with filters: service/operation/ts range/min_duration) + GET /api/v1/traces/{trace_id} (waterfall structure with all spans)",
-        "All Query API SQL goes through MustTenantScope(ctx, q) helper (PRE-3); attempting bare SQL fails a lint or build check",
-        "ClickHouse Row Policy enforces tenant_id filter at CH level (defense-in-depth on top of builder)",
-        "Frontend /traces page (Vue): list (sortable by ts/duration) + detail waterfall + JSON / Service Map subtabs (port from openapm/js/pages-traces.js)",
-        "Cross-tenant E2E reverse test: tenant A ingests trace, tenant B queries with own key → 0 results (no cross-talk)",
-        "Per-ingest metering event written to PG metering_events (tenant_id, signal_type='trace', count=spans_in_batch)",
-        "Slice 1 CI matrix: all backend tests pass + new ch-related integration test + frontend Traces page Playwright spec green"
+        "ingester OTLP receiver reads Authorization: Bearer <api-key> from gRPC metadata / HTTP header; resolves via auth.PGResolver to obtain authoritative tenant_id; rejects missing or invalid Bearer with 401 + ingester_auth_{missing,invalid}_total counter. SDK-declared tenant.id resource attribute is dropped (cannot be spoofed). [evolved from original Collector-processor framing during 2026-05-25 brainstorming]",
+        "CH traces_v1 table created (tenant_id LowCardinality(String), trace_id, span_id, parent_span_id, service, operation, ts DateTime64(9), duration UInt64, status, span_kind, resource_attributes Map(LowCardinality(String),String), attributes Map(LowCardinality(String),String)); ORDER BY (tenant_id, service, ts) PARTITION BY (tenant_id, toYYYYMMDD(ts)); INDEX idx_trace_id bloom_filter; Row Policy tenant_isolation_traces_v1 attached",
+        "Go ingester service is itself the OTLP receiver (gRPC :4317 + HTTP :4318, embeds go.opentelemetry.io/collector/receiver/otlpreceiver); writes batches to CH traces_v1 via chquery.PrepareBatch; tenant_id is server-stamped after PG resolve (not propagated from any upstream). Collector is removed from data path. [evolved from original 'receives OTLP from Collector' framing]",
+        "Query API: GET /api/v1/traces (list with filters: service/operation/ts_from/ts_to/min_duration_ms, sort ts|duration, limit/offset, has_more pagination) + GET /api/v1/traces/{trace_id} (flat span list for waterfall; 404 if not present under tenant). Both routes live on cmd/query :8081 behind Caddy /api/v1/traces* prefix handle",
+        "All Query API SQL goes through chquery.Conn (MustTenantScope helper for Query/Exec; PrepareBatch wrapper for batch writes); make lint-ch CI step rejects bare clickhouse-go imports outside internal/chquery (already enforced from PRE-3 + automatically covers new internal/ingest/ + internal/query/)",
+        "ClickHouse Row Policy tenant_isolation_traces_v1 enforces tenant_id = getSetting('custom_tenant_id') at CH level (defense-in-depth on top of builder)",
+        "Frontend /traces page (Vue): list view (sortable ts/duration via NDataTable, filter bar) + detail waterfall (hand-rolled SVG, no D3) + JSON subtab. Service Map subtab is a 'Coming in SLICE-3' placeholder; the real force-directed graph component is co-designed with SLICE-3 global topology. [evolved — Service Map subtab body deferred to SLICE-3]",
+        "Cross-tenant reverse test as Go integration test (build tag integration) in backend/internal/ingest/cross_tenant_test.go: tenant A ingests via OTLP/gRPC with key-acme, tenant B queries with key-beta → 0 list results + 404 on detail; missing/garbage Bearer → 401; tenant A's own queries see correct counts. Six sub-assertions total.",
+        "Per-OTLP-Export-call metering event written to PG metering_events (tenant_id, signal_type='trace', count=spans_in_batch). Write is best-effort: CH commit returns OK to SDK regardless; PG metering failure increments ingester_metering_failed_total + slog.Error. Retry queue is post-SLICE-1. [evolved — best-effort policy made explicit]",
+        "Slice 1 CI matrix: backend-unit (existing + new chquery.Batch / internal/ingest / internal/query unit tests) + backend-integration NEW job (-tags=integration -timeout=240s; runs all dockertest suites including cross_tenant) + frontend-unit (+ new Traces vitest specs) + e2e (with new make seed-traces helper + traces.spec.ts Playwright) + lint-ch unchanged"
       ],
       "out_of_scope": [
         "Log ingest (SLICE-2)",
-        "Topology / Service detail page (SLICE-3)",
+        "Topology / Service detail page (SLICE-3); Service Map subtab body lives there",
         "Metrics ingest + Alerts (SLICE-4)",
         "Sampling decisions (Slice 5+ — for now ingest 100%)",
-        "Trace search via attribute index (post-MVP — for now ts-range scan)"
+        "Trace search via attribute index (post-MVP — for now ts-range scan)",
+        "AsyncInsert / column-mode batch on chquery.Batch (add when throughput data demands)",
+        "Cursor pagination on /api/v1/traces (offset paging ships with documented streaming-drift limitation)",
+        "OTLP events / links columns on traces_v1 (cross-jump to logs in SLICE-2 is the planned mitigation)",
+        "Proactive 501 stubs for /api/v1/logs|services|topology routes (future slices add their own one-line Caddy handle per CLAUDE.md routing rule)",
+        "Collector custom processor (Collector removed from data path entirely; users wanting Collector-style enrichment run their own pointing at ingester:4317)",
+        "PGResolver hot-path optimization (Slice 0 known_drift D1 still applies; mitigation if ingester throughput > ~50 req/s)"
       ],
       "dependencies": ["SLICE-0", "PRE-1", "PRE-2", "PRE-3"],
-      "spec": "(to be written via /harness:brainstorming — should produce docs/specs/YYYY-MM-DD-slice-1-trace-design.md)",
-      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/YYYY-MM-DD-slice-1-plan.md)",
+      "spec": "docs/specs/2026-05-25-slice-1-trace-design.md",
+      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/2026-05-25-slice-1-plan.md)",
       "estimated_effort_days": "21",
       "owner": "@huangbaixun",
-      "notes": "Per Slice 0 plan §5, this is the first vertical slice. Path B (vertical slice) discipline: ship a complete demo-able Trace flow before starting SLICE-2 Logs. Plan to use OTel hot-r.o.d. demo as data source (NOT old repo's simulator-service). Slice 0 lessons (docs/lessons-learned-2026-05-24.md) apply — particularly nginx /api proxy discipline and NaiveUI test selectors."
+      "notes": "First vertical slice (Path B). Spec landed 2026-05-25 after brainstorming session; 4 ACs evolved (see acceptance_criteria entries tagged [evolved ...]). Brainstorming closed open task SLICE-1-PREP-1 (chquery.Conn batch path) by deciding to extend the wrapper rather than open a lint exception — implementation tracked in spec §4. Per Slice 0 plan §5 + lessons (docs/lessons-learned-2026-05-24.md): apply Slice 0 NaiveUI test-selector + nginx /api proxy discipline + Go-version pinning. Plan to use telemetrygen for CI determinism + hot-r.o.d. (--profile demo) for manual visual demo."
     }
   ]
 }
