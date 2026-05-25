@@ -13,6 +13,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.opentelemetry.io/collector/component/componenttest"
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
@@ -54,9 +55,22 @@ func run(logger *slog.Logger) error {
 	defer ch.Close()
 
 	resolver := auth.NewPGResolver(db)
+
+	consumer := ingest.NewConsumer()
+	rcvr, err := ingest.NewOTLPReceiver(ingest.ReceiverConfig{
+		GRPCAddr: cfg.IngesterOTLPGRPCAddr,
+		HTTPAddr: cfg.IngesterOTLPHTTPAddr,
+	}, consumer)
+	if err != nil {
+		return fmt.Errorf("otlp receiver build: %w", err)
+	}
+	if err := rcvr.Start(context.Background(), componenttest.NewNopHost()); err != nil {
+		return fmt.Errorf("otlp receiver start: %w", err)
+	}
+	logger.Info("ingester otlp listening", "grpc", cfg.IngesterOTLPGRPCAddr, "http", cfg.IngesterOTLPHTTPAddr)
 	_ = resolver // wired into the consumer in Task 5
 
-	// Admin server first — OTLP receiver wiring lands in Task 4.
+	// Admin server.
 	adminSrv := &http.Server{
 		Addr:              cfg.IngesterAdminAddr,
 		Handler:           ingest.AdminHandler(),
@@ -88,6 +102,9 @@ func run(logger *slog.Logger) error {
 	defer cancel()
 	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
 		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
+	}
+	if rcvrErr := rcvr.Shutdown(ctx); rcvrErr != nil && runErr == nil {
+		runErr = fmt.Errorf("otlp receiver shutdown: %w", rcvrErr)
 	}
 	logger.Info("ingester shutdown complete")
 	return runErr
