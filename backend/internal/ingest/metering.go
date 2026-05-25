@@ -1,7 +1,9 @@
 package ingest
 
+import "github.com/google/uuid"
+
 // Metering is the per-batch usage event recorder. T6 lands the real impl.
-// For T5 we declare the type and an Enqueue stub so Consumer compiles.
+// Stub interface here so Consumer compiles and the T6 swap is drop-in.
 type Metering struct{}
 
-func (m *Metering) Enqueue(tid any, count int) { _ = tid; _ = count }
+func (m *Metering) Enqueue(tid uuid.UUID, count int) { _ = tid; _ = count }

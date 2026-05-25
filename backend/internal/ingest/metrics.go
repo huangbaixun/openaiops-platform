@@ -14,24 +14,30 @@ type Metrics struct {
 	BatchDuration  *prometheus.HistogramVec
 }
 
-func NewMetrics() *Metrics {
+// NewMetrics constructs Prometheus collectors against the provided Registerer.
+// Pass prometheus.DefaultRegisterer in production (so the admin /metrics handler
+// picks them up). Pass prometheus.NewRegistry() in tests to avoid
+// "duplicate metrics collector registration" panics when the test binary
+// constructs multiple Consumers.
+func NewMetrics(r prometheus.Registerer) *Metrics {
+	f := promauto.With(r)
 	return &Metrics{
-		AuthMissing: promauto.NewCounter(prometheus.CounterOpts{
+		AuthMissing: f.NewCounter(prometheus.CounterOpts{
 			Name: "ingester_auth_missing_total",
 		}),
-		AuthInvalid: promauto.NewCounter(prometheus.CounterOpts{
+		AuthInvalid: f.NewCounter(prometheus.CounterOpts{
 			Name: "ingester_auth_invalid_total",
 		}),
-		SpansAccepted: promauto.NewCounterVec(prometheus.CounterOpts{
+		SpansAccepted: f.NewCounterVec(prometheus.CounterOpts{
 			Name: "ingester_spans_accepted_total",
 		}, []string{"tenant_id", "service"}),
-		SpansRejected: promauto.NewCounterVec(prometheus.CounterOpts{
+		SpansRejected: f.NewCounterVec(prometheus.CounterOpts{
 			Name: "ingester_spans_rejected_total",
 		}, []string{"reason"}),
-		MeteringFailed: promauto.NewCounter(prometheus.CounterOpts{
+		MeteringFailed: f.NewCounter(prometheus.CounterOpts{
 			Name: "ingester_metering_failed_total",
 		}),
-		BatchDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+		BatchDuration: f.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    "ingester_batch_duration_seconds",
 			Buckets: prometheus.DefBuckets,
 		}, []string{"outcome"}),

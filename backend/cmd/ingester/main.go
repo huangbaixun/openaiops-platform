@@ -13,6 +13,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
@@ -55,7 +56,7 @@ func run(logger *slog.Logger) error {
 
 	resolver := auth.NewPGResolver(db)
 
-	metrics := ingest.NewMetrics()
+	metrics := ingest.NewMetrics(prometheus.DefaultRegisterer)
 	consumer := ingest.NewConsumer(resolver, ch, nil, metrics)
 	rcvr, err := ingest.NewOTLPReceiver(ingest.ReceiverConfig{
 		GRPCAddr: cfg.IngesterOTLPGRPCAddr,
