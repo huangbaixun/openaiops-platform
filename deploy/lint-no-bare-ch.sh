@@ -7,6 +7,8 @@ ROOT="${ROOT:-backend}"
 SCAN_DIRS="
 ${ROOT}/internal/query
 ${ROOT}/internal/ingest
+${ROOT}/internal/logingest
+${ROOT}/internal/ingestshared
 ${ROOT}/cmd
 "
 
