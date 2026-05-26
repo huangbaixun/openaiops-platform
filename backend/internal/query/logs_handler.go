@@ -40,6 +40,8 @@ func (h *LogsHandler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad ts_from: must be RFC3339", http.StatusBadRequest)
 		return
 	}
+	// +1s lookahead mitigates drift D1: clickhouse-go Time-param rounding
+	// excludes rows written within ~1s of strict `ts < now`. SLICE-1 known_drift.
 	tsTo, err := parseTsOrDefault(q.Get("ts_to"), time.Now().UTC().Add(1*time.Second))
 	if err != nil {
 		http.Error(w, "bad ts_to: must be RFC3339", http.StatusBadRequest)
