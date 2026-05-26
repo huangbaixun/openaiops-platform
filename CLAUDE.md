@@ -15,12 +15,15 @@
 - 反例 E2E（A 写 / B 读 → 0）是 SLICE-1 AC #8 落地，不是 PRE-3。
 
 ### 端口
-- canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 / 3000。本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `OTEL_GRPC_HOST_PORT` / `OTEL_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
+- canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 (ingester) / 4327 / 4328 / 8083 (log-ingester, SLICE-2 起) / 3000 (frontend)。Caddy :443 is the sole ingress for /api/* (drift D4 closed in SLICE-2)。
+- 本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `INGESTER_OTLP_GRPC_HOST_PORT` / `INGESTER_OTLP_HTTP_HOST_PORT` / `LOG_INGESTER_OTLP_GRPC_HOST_PORT` / `LOG_INGESTER_OTLP_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
 
 ### 二进制 + 路由划分（ADR-0003）
 - gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/healthz`、`/livez`。依赖 PG。
 - query (`cmd/query`, :8081)：CH 读路径 — `/api/v1/traces*`、`/api/v1/logs*`、`/api/v1/services*`、`/api/v1/topology*`。依赖 PG (auth) + CH (data)。
-- Caddy 用 `handle`（保留前缀）按路径分发 — query 前缀优先匹配，其它 `/api/*` 落 gateway。
+- ingester (`cmd/ingester`, :4317/:4318/:8082)：OTLP trace receiver。
+- log-ingester (`cmd/log-ingester`, :4327/:4328/:8083)：OTLP log receiver（mirrors cmd/ingester for logs, SLICE-2 起）。
+- Caddy :443 是 `/api/*` 的唯一入口（drift D4 in SLICE-2 closed）；frontend 容器仅 static SPA，不再 proxy /api。Caddy 用 `handle`（保留前缀）按路径分发 — `/api/v1/traces*` + `/api/v1/logs*` 优先匹配 query:8081，其它 `/api/*` 落 gateway:8080。
 - 共享代码全在 `backend/internal/` — `auth`、`apikey`、`tenant`、`config`、`httpsrv`、`chquery`（PRE-3 实现）。`internal/query/` 和 `internal/ingest/` 下任何裸 `ch.Query(`/`ch.Exec(` 都 lint fail，必走 `chquery.MustTenantScope`。
 - metering 只在写路径写。查询请求**不**写 `metering_events`（页面刷新即烧额度=糟糕 UX，v0.1 决定）。
 
@@ -41,7 +44,7 @@
 - frontend：`npx vitest run` 单元；`npx playwright test` 跑 E2E（需 stack up 且 seed 过）。
 
 ## 已知陷阱（详见 `docs/lessons-learned-2026-05-24.md`）
-- **nginx `/api` proxy 必须**：缺了认证假成功 + 返回空租户。
+- **nginx `/api` proxy 已删除（drift D4 closed SLICE-2）**：Caddy 是 `/api/*` 唯一入口；frontend nginx 已是 static-only。旧陷阱：缺了认证假成功 + 返回空租户——现在不再适用，改为确保 Caddy handle 顺序正确。
 - **NaiveUI `NInput` data-testid 在 wrapper div 上**：测试要 `.locator('input')` 钻进去。
 - **Node 25 内置 Storage 缺 `.clear()`**：vitest 用 `tests/setup.ts` shim 兜。
 - **Go 版本：本机 + go.mod + Dockerfile + CI matrix 必须一致**（当前 1.25.0）。

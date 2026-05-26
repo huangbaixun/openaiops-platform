@@ -137,6 +137,29 @@ services:
       timeout: 3s
       retries: 10
 
+  log-ingester:
+    build: ../backend
+    entrypoint: ["/usr/local/bin/log-ingester"]
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+      CLICKHOUSE_DSN: "clickhouse://openaiops:openaiops@clickhouse:9000/openaiops"
+      LOG_INGESTER_OTLP_GRPC_ADDR: "0.0.0.0:4327"
+      LOG_INGESTER_OTLP_HTTP_ADDR: "0.0.0.0:4328"
+      LOG_INGESTER_ADMIN_ADDR: "0.0.0.0:8083"
+    ports:
+      - "127.0.0.1:${LOG_INGESTER_OTLP_GRPC_HOST_PORT:-4327}:4327"
+      - "127.0.0.1:${LOG_INGESTER_OTLP_HTTP_HOST_PORT:-4328}:4328"
+    depends_on:
+      postgres:   { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      ch-migrate: { condition: service_completed_successfully }
+      migrate:    { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   frontend:
     build: ../frontend
     environment:

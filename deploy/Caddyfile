@@ -7,8 +7,13 @@ localhost {
 	tls internal
 
 	# Query prefix wins first. Mirrors the gateway pattern — strip /api so the
-	# backend sees /v1/traces (post-strip paths everywhere).
+	# backend sees /v1/traces or /v1/logs (post-strip paths everywhere).
 	handle /api/v1/traces* {
+		uri strip_prefix /api
+		reverse_proxy query:8081
+	}
+
+	handle /api/v1/logs* {
 		uri strip_prefix /api
 		reverse_proxy query:8081
 	}
