@@ -15,9 +15,11 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/config"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
+	"github.com/huangbaixun/openaiops-platform/backend/internal/logingest"
 )
 
 func main() {
@@ -57,8 +59,19 @@ func run(logger *slog.Logger) error {
 	metering := ingestshared.NewMetering(db, base, "log")
 	defer metering.Close()
 
-	// Placeholder — T4 will wire the OTLP log receiver here using ch + metering.
-	_ = ch
+	resolver := auth.NewPGResolver(db)
+	consumer := logingest.NewLogConsumer(resolver, ch, metering, base)
+	rcvr, err := logingest.NewOTLPLogReceiver(logingest.ReceiverConfig{
+		GRPCAddr: cfg.LogIngesterOTLPGRPCAddr,
+		HTTPAddr: cfg.LogIngesterOTLPHTTPAddr,
+	}, consumer)
+	if err != nil {
+		return fmt.Errorf("otlp log receiver build: %w", err)
+	}
+	if err := rcvr.Start(context.Background(), ingestshared.NewHost()); err != nil {
+		return fmt.Errorf("otlp log receiver start: %w", err)
+	}
+	logger.Info("log-ingester otlp listening", "grpc", cfg.LogIngesterOTLPGRPCAddr, "http", cfg.LogIngesterOTLPHTTPAddr)
 
 	// Admin server.
 	adminSrv := &http.Server{
@@ -88,7 +101,13 @@ func run(logger *slog.Logger) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	// Flush pending metering events before tearing down connections.
+	// Drain real traffic first — OTLP receiver before admin so /healthz keeps
+	// answering until the receiver has stopped accepting batches.
+	if rcvrErr := rcvr.Shutdown(ctx); rcvrErr != nil && runErr == nil {
+		runErr = fmt.Errorf("otlp log receiver shutdown: %w", rcvrErr)
+	}
+	// Receiver stopped → no new metering events. Flush whatever is pending in
+	// the queue before tearing down admin + PG/CH connections.
 	metering.Drain(ctx)
 	if shutdownErr := adminSrv.Shutdown(ctx); shutdownErr != nil && runErr == nil {
 		runErr = fmt.Errorf("admin shutdown: %w", shutdownErr)
