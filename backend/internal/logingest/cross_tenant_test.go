@@ -251,11 +251,17 @@ func TestSlice2_CrossTenantLogs(t *testing.T) {
 		now.Add(-time.Hour).Format(time.RFC3339Nano),
 		now.Add(time.Hour).Format(time.RFC3339Nano))
 
-	// ---------- Sub-assertion 1: A ingests via gRPC ----------
-	t.Run("sub1_A_ingest_grpc_3_logs", func(t *testing.T) {
-		err := sendLogGRPC(t, env.IngestGRPCAddr, keyA, logs)
-		require.NoError(t, err, "sub1: OTLP/gRPC ingest must succeed for tenant A with valid bearer")
-		pollLogsCH(t, env.CHConn, tidA, 3, 10*time.Second)
+	// ---------- Sub-assertion 1: A ingests via gRPC (gates all later sub-tests) ----------
+	// Run OUTSIDE t.Run so that ingest failures cascade — otherwise sub-2/sub-3 would
+	// pass vacuously (empty list trivially satisfies require.Empty). Matches the
+	// SLICE-1 trace cross_tenant_test.go pattern at internal/ingest/cross_tenant_test.go.
+	require.NoError(t,
+		sendLogGRPC(t, env.IngestGRPCAddr, keyA, logs),
+		"sub1: OTLP/gRPC ingest must succeed for tenant A with valid bearer")
+	pollLogsCH(t, env.CHConn, tidA, 3, 10*time.Second)
+	t.Run("sub1_A_ingest_grpc_3_logs_recorded", func(t *testing.T) {
+		// Marker sub-test — the actual assertion ran above so the failure surfaces
+		// before sibling sub-tests can produce false-greens.
 	})
 
 	// ---------- Sub-assertion 2: B sees no logs ----------
