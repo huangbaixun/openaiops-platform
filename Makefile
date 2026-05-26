@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up seed-traces demo-traces
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up seed-traces demo-traces seed-logs demo-logs
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -76,3 +76,11 @@ seed-traces:
 # Start the hot-r.o.d. demo service that streams lifelike business traffic into the ingester.
 demo-traces:
 	docker compose -f deploy/docker-compose.yml --profile demo up -d hot-r-o-d
+
+# Seed deterministic log data into the running log-ingester (used by CI e2e + manual sanity).
+# Honors LOG_INGESTER_OTLP_GRPC_HOST_PORT for local override.
+seed-logs:
+	cd backend && go run ./cmd/seed-logs
+
+demo-logs: seed-traces seed-logs
+	@echo "demo data seeded — open https://localhost/logs and https://localhost/traces"

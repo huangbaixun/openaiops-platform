@@ -127,6 +127,20 @@ jobs:
             --spans=5 \
             --traces=3
 
+      - name: verify seed-logs exists (SLICE-2 T13)
+        run: |
+          if [ ! -d backend/cmd/seed-logs ]; then
+            echo "::error::backend/cmd/seed-logs missing — T13 must land before T14 e2e seeding"
+            exit 1
+          fi
+
+      - name: seed logs (in-process OTLP/gRPC against running log-ingester)
+        run: |
+          cd backend && go run ./cmd/seed-logs \
+            --target=localhost:4327 \
+            --key=test-key-acme \
+            --count=5
+
       - name: e2e
         working-directory: frontend
         env:
