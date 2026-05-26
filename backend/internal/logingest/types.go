@@ -3,6 +3,8 @@ package logingest
 import "time"
 
 // LogRow is one CH logs_v1 row, post mapping from plog.LogRecord.
+// Field order matches the logs_v1 INSERT statement; tenant_id is prepended by
+// the consumer at batch.Append time (server-stamped after Bearer resolve).
 type LogRow struct {
 	Ts                 time.Time
 	ObservedTs         time.Time

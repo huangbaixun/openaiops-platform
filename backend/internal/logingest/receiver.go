@@ -25,8 +25,8 @@ type ReceiverConfig struct {
 //
 // IncludeMetadata: true is required on BOTH protocols from day 1. SLICE-1
 // T10/T13 caught the same flag missing on the trace receiver — Authorization
-// headers were silently lost on the affected transport. We assert sub-assertion
-// 7 of cross_tenant_test.go (T11) specifically to lock this for logs.
+// headers were silently lost on the affected transport. Sub-assertion 7 of
+// backend/internal/logingest/cross_tenant_test.go (T11) locks this for logs.
 func NewOTLPLogReceiver(cfg ReceiverConfig, c *LogConsumer) (receiver.Logs, error) {
 	factory := otlpreceiver.NewFactory()
 	rcvrCfg := factory.CreateDefaultConfig().(*otlpreceiver.Config)
