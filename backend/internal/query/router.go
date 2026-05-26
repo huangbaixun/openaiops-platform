@@ -12,7 +12,7 @@ import (
 
 // NewRouter wires the query binary's chi router.
 // /livez is auth-free (docker-compose healthcheck). All /v1/traces*
-// routes are behind auth.Middleware(resolver) — Bearer required.
+// and /v1/logs routes are behind auth.Middleware(resolver) — Bearer required.
 //
 // Routes are registered without the /api prefix because Caddy strips
 // /api before reverse-proxying (mirrors gateway). Direct hits on
@@ -30,9 +30,13 @@ func NewRouter(resolver auth.Resolver, ch *chquery.Conn) *chi.Mux {
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(resolver))
-		h := NewTracesHandler(ch)
-		r.Get("/v1/traces", h.List)
-		r.Get("/v1/traces/{trace_id}", h.Detail)
+
+		th := NewTracesHandler(ch)
+		r.Get("/v1/traces", th.List)
+		r.Get("/v1/traces/{trace_id}", th.Detail)
+
+		lh := NewLogsHandler(NewLogsRepo(ch))
+		r.Get("/v1/logs", lh.List)
 	})
 	return r
 }

@@ -28,7 +28,10 @@ func (fatalReporter) Helper()                                  {}
 func (fatalReporter) Fatalf(format string, args ...interface{}) { log.Fatalf(format, args...) }
 
 func TestMain(m *testing.M) {
-	fixture := chtest.StartCH(fatalReporter{}, "20260525120000_create_traces_v1.sql")
+	fixture := chtest.StartCH(fatalReporter{},
+		"20260525120000_create_traces_v1.sql",
+		"20260527120000_create_logs_v1.sql",
+	)
 	dsn = fixture.DSN
 
 	code := m.Run()
@@ -42,6 +45,24 @@ func setupCH(t *testing.T) *chquery.Conn {
 	c, err := chquery.Connect(context.Background(), dsn)
 	require.NoError(t, err)
 	return c
+}
+
+// seedLog inserts a single log row under the tenant in ctx.
+func seedLog(t *testing.T, conn *chquery.Conn, ctx context.Context, tidStr, service, severity, body, traceID string) {
+	t.Helper()
+	now := time.Now().UTC()
+	batch, err := conn.PrepareBatch(ctx,
+		`INSERT INTO logs_v1 (
+			tenant_id, ts, observed_ts, service, severity_text, severity_number,
+			body, trace_id, span_id, trace_flags, resource_attributes, attributes
+		) VALUES`)
+	require.NoError(t, err)
+	require.NoError(t, batch.Append(
+		tidStr, now, now, service, severity, uint8(0),
+		body, traceID, "", uint8(0),
+		map[string]string{}, map[string]string{},
+	))
+	require.NoError(t, batch.Send())
 }
 
 // seedSpans inserts n spans of a single trace under tid. Shared between
