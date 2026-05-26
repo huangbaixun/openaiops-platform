@@ -190,6 +190,7 @@ func TestSlice2_MeteringSignalLog(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	base := ingestshared.NewBaseMetrics(reg, "log")
 	metering := ingestshared.NewMetering(meteringPGPool, base, "log")
+	t.Cleanup(metering.Close) // future-proof: today Close is no-op, but registering it now means if Drain ever times out the goroutine is reaped
 
 	consumer := logingest.NewLogConsumer(resolver, chConn, metering, base)
 
