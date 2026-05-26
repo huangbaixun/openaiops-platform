@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { SpanDetail } from '../../api/traces'
 
 const props = defineProps<{ spans: SpanDetail[] }>()
+const emit = defineEmits<{ (e: 'span-click', spanId: string): void }>()
 
 interface Laid {
   span: SpanDetail
@@ -78,6 +79,8 @@ const layout = computed<{ rows: Laid[]; total: number; startNs: number; height: 
         :height="ROW_H - 4"
         :fill="row.fill"
         data-testid="waterfall-span"
+        style="cursor: pointer"
+        @click="emit('span-click', row.span.span_id)"
       >
         <title>
           {{ row.span.service }} · {{ row.span.operation }} ·

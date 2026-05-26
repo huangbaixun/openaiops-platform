@@ -1,17 +1,35 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NTabs, NTabPane, NEmpty, NSpin } from 'naive-ui'
 import WaterfallChart from './WaterfallChart.vue'
+import LogsPanel from '../../components/LogsPanel.vue'
 import { useTraceDetail } from '../../composables/useTraces'
 
 const props = defineProps<{ traceId: string }>()
+const route = useRoute()
 const { t } = useI18n()
 const { detail, loading, load } = useTraceDetail()
-const active = ref<'waterfall' | 'json' | 'serviceMap'>('waterfall')
+const active = ref<'waterfall' | 'json' | 'serviceMap' | 'logs'>('waterfall')
+const selectedSpanId = ref<string | null>(null)
 
-onMounted(() => load(props.traceId))
+onMounted(() => {
+  load(props.traceId)
+  const focusSpan = route.query.focus_span
+  if (focusSpan && typeof focusSpan === 'string') {
+    selectedSpanId.value = focusSpan
+  }
+})
 watch(() => props.traceId, (id) => load(id))
+
+function onSpanClick(spanId: string) {
+  selectedSpanId.value = spanId
+}
+
+function clearSpan() {
+  selectedSpanId.value = null
+}
 </script>
 
 <template>
@@ -19,7 +37,7 @@ watch(() => props.traceId, (id) => load(id))
     <NSpin :show="loading">
       <NTabs v-model:value="active" type="line" animated>
         <NTabPane name="waterfall" :tab="t('traces.tabWaterfall')">
-          <WaterfallChart v-if="detail" :spans="detail.spans" />
+          <WaterfallChart v-if="detail" :spans="detail.spans" @span-click="onSpanClick" />
           <NEmpty v-else />
         </NTabPane>
 
@@ -34,6 +52,14 @@ watch(() => props.traceId, (id) => load(id))
           <NEmpty
             :description="t('traces.serviceMapComingSoon')"
             data-testid="service-map-placeholder"
+          />
+        </NTabPane>
+
+        <NTabPane name="logs" :tab="t('logs.tab')">
+          <LogsPanel
+            :trace-id="(route.params.traceId as string)"
+            :span-id="selectedSpanId"
+            @clear-span="clearSpan"
           />
         </NTabPane>
       </NTabs>
