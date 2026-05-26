@@ -11,26 +11,6 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-// fakePGDB satisfies *sql.DB via embedding — but we can't embed since sql.DB
-// is concrete. Instead we use a thin wrapper that satisfies the ExecContext
-// call indirectly. We swap the real *sql.DB with a test double by opening an
-// in-memory sqlite-like database — or we just test via the internal run loop.
-//
-// Since Metering embeds *sql.DB we test via a real but minimal DB. For the
-// queue-full and pg-error cases we use the unexported newMeteringForTest helper.
-
-type fakeSQLDB struct {
-	inserts []struct {
-		tid    uuid.UUID
-		signal string
-		count  int
-	}
-	failErr error
-}
-
-// stubDB wraps fakeSQLDB as a *sql.DB is not interfaceable; we use a helper
-// constructor that accepts a pgExec-like interface.
-
 // pgExecIface is the narrow subset of *sql.DB used by metering.
 type pgExecIface interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)

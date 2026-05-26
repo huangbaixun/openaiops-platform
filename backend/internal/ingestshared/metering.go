@@ -18,23 +18,24 @@ type MeteringEvent struct {
 }
 
 // Metering is a best-effort PG sink. Enqueue returns immediately; failures are
-// counted and logged. Drain blocks until the queue is empty or ctx done.
+// counted and logged. Drain blocks until the queue is empty or ctx done. Counter
+// label is taken from each event's SignalType — one Metering instance can serve
+// mixed signals if a binary ever multiplexes them.
 type Metering struct {
 	db      *sql.DB
 	metrics *BaseMetrics
-	signal  string // "trace" | "log" — used in metric label
 	queue   chan MeteringEvent
 	wg      sync.WaitGroup
 	closed  chan struct{}
 }
 
-// NewMetering starts an async metering writer. signal is used for counter
-// labels ("trace" or "log"). Caller must call Drain then Close on shutdown.
-func NewMetering(db *sql.DB, metrics *BaseMetrics, signal string) *Metering {
+// NewMetering starts an async metering writer. The signal arg is reserved for
+// future per-instance overrides; today the label is read from MeteringEvent.SignalType.
+// Caller must call Drain then Close on shutdown.
+func NewMetering(db *sql.DB, metrics *BaseMetrics, _ string) *Metering {
 	m := &Metering{
 		db:      db,
 		metrics: metrics,
-		signal:  signal,
 		queue:   make(chan MeteringEvent, 1024),
 		closed:  make(chan struct{}),
 	}
