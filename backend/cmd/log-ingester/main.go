@@ -57,9 +57,8 @@ func run(logger *slog.Logger) error {
 	metering := ingestshared.NewMetering(db, base, "log")
 	defer metering.Close()
 
-	// Placeholders — T4 will wire the OTLP log receiver here.
+	// Placeholder — T4 will wire the OTLP log receiver here using ch + metering.
 	_ = ch
-	_ = metering
 
 	// Admin server.
 	adminSrv := &http.Server{

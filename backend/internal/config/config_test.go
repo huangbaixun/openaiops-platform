@@ -5,6 +5,10 @@ import "testing"
 func TestFromEnv_LogIngesterDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("CLICKHOUSE_DSN", "clickhouse://x")
+	// Clear shell-leaked values so defaults reliably apply (defaultAddr falls back when env=="").
+	t.Setenv("LOG_INGESTER_OTLP_GRPC_ADDR", "")
+	t.Setenv("LOG_INGESTER_OTLP_HTTP_ADDR", "")
+	t.Setenv("LOG_INGESTER_ADMIN_ADDR", "")
 	c, err := FromEnv()
 	if err != nil {
 		t.Fatal(err)
