@@ -5,14 +5,42 @@
   "owner": "@huangbaixun",
   "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
   "history": [
-    {"date": "2026-05-24", "event": "Repo created + features.json with SLICE-0 (status: building)"},
-    {"date": "2026-05-24", "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"},
-    {"date": "2026-05-24", "event": "PRE-1 resolved — ADR-0002 chose ch-migrate service (Option B); scaffold landed + smoke verified"},
-    {"date": "2026-05-24", "event": "PRE-2 resolved — ADR-0003 chose split cmd/query/ (Option B) under Heavy-soon workload assumption; spec + ADR landed, no code changes yet"},
-    {"date": "2026-05-24", "event": "PRE-3 resolved — chquery package (MustTenantScope helper + Conn wrapper) + Row Policy template + prod CH custom_settings config + build-time lint. SLICE-1 unblocked. 7 commits 80344d7..ce7ed1b."},
-    {"date": "2026-05-25", "event": "SLICE-1 spec landed (docs/specs/2026-05-25-slice-1-trace-design.md) — brainstormed Bearer-on-receiver tenant trust + ingester-as-OTLP-receiver (Collector out of data path) + chquery.Batch wrapper closing SLICE-1-PREP-1. AC #1/#3/#7/#9 evolved (see acceptance_criteria below). Next: writing-plans for docs/plans/2026-05-25-slice-1-plan.md."},
-    {"date": "2026-05-26", "event": "SLICE-1 done — 16 tasks, ~27 commits, 10/10 ACs verified. Three bugs caught + fixed during execution (ingester IncludeMetadata both transports; CH replay-safety; frontend nginx /api/v1/traces routing). See deploy/SLICE-1-evidence.txt."},
-    {"date": "2026-05-26", "event": "SLICE-1-PREP-1 resolved — chquery.Conn.PrepareBatch + *chquery.Batch wrapper landed in commit 1a00986; tenant pinned at PrepareBatch time, smoke-verified with TestSmoke_BatchTenantIsolation."}
+    {
+      "date": "2026-05-24",
+      "event": "Repo created + features.json with SLICE-0 (status: building)"
+    },
+    {
+      "date": "2026-05-24",
+      "event": "SLICE-0 done — CI green, 8/8 ACs verified (AC-7 partial: goose down not auto-tested)"
+    },
+    {
+      "date": "2026-05-24",
+      "event": "PRE-1 resolved — ADR-0002 chose ch-migrate service (Option B); scaffold landed + smoke verified"
+    },
+    {
+      "date": "2026-05-24",
+      "event": "PRE-2 resolved — ADR-0003 chose split cmd/query/ (Option B) under Heavy-soon workload assumption; spec + ADR landed, no code changes yet"
+    },
+    {
+      "date": "2026-05-24",
+      "event": "PRE-3 resolved — chquery package (MustTenantScope helper + Conn wrapper) + Row Policy template + prod CH custom_settings config + build-time lint. SLICE-1 unblocked. 7 commits 80344d7..ce7ed1b."
+    },
+    {
+      "date": "2026-05-25",
+      "event": "SLICE-1 spec landed (docs/specs/2026-05-25-slice-1-trace-design.md) — brainstormed Bearer-on-receiver tenant trust + ingester-as-OTLP-receiver (Collector out of data path) + chquery.Batch wrapper closing SLICE-1-PREP-1. AC #1/#3/#7/#9 evolved (see acceptance_criteria below). Next: writing-plans for docs/plans/2026-05-25-slice-1-plan.md."
+    },
+    {
+      "date": "2026-05-26",
+      "event": "SLICE-1 done — 16 tasks, ~27 commits, 10/10 ACs verified. Three bugs caught + fixed during execution (ingester IncludeMetadata both transports; CH replay-safety; frontend nginx /api/v1/traces routing). See deploy/SLICE-1-evidence.txt."
+    },
+    {
+      "date": "2026-05-26",
+      "event": "SLICE-1-PREP-1 resolved — chquery.Conn.PrepareBatch + *chquery.Batch wrapper landed in commit 1a00986; tenant pinned at PrepareBatch time, smoke-verified with TestSmoke_BatchTenantIsolation."
+    },
+    {
+      "date": "2026-05-26",
+      "event": "SLICE-2 spec landed (docs/specs/2026-05-26-slice-2-log-design.md) — brainstormed binary split (cmd/log-ingester own ports 4327/4328/8083), first-class trace_id+span_id correlation, drift D4 routing consolidation, body substring via positionUTF8 (no text index), packaging B (span scoping + JSON pretty-print). 10 ACs. Next: writing-plans for docs/plans/2026-05-26-slice-2-plan.md."
+    }
   ],
   "legend": {
     "priority": "P0=MVP blocker / P1=post-MVP / P2=enhancement",
@@ -115,12 +143,57 @@
         "Collector custom processor (Collector removed from data path entirely; users wanting Collector-style enrichment run their own pointing at ingester:4317)",
         "PGResolver hot-path optimization (Slice 0 known_drift D1 still applies; mitigation if ingester throughput > ~50 req/s)"
       ],
-      "dependencies": ["SLICE-0", "PRE-1", "PRE-2", "PRE-3"],
+      "dependencies": [
+        "SLICE-0",
+        "PRE-1",
+        "PRE-2",
+        "PRE-3"
+      ],
       "spec": "docs/specs/2026-05-25-slice-1-trace-design.md",
       "plan": "(to be written via /harness:writing-plans — should produce docs/plans/2026-05-25-slice-1-plan.md)",
       "estimated_effort_days": "21",
       "owner": "@huangbaixun",
       "notes": "First vertical slice (Path B). Spec landed 2026-05-25 after brainstorming session; 4 ACs evolved (see acceptance_criteria entries tagged [evolved ...]). Brainstorming closed open task SLICE-1-PREP-1 (chquery.Conn batch path) by deciding to extend the wrapper rather than open a lint exception — implementation tracked in spec §4. Per Slice 0 plan §5 + lessons (docs/lessons-learned-2026-05-24.md): apply Slice 0 NaiveUI test-selector + nginx /api proxy discipline + Go-version pinning. Plan to use telemetrygen for CI determinism + hot-r.o.d. (--profile demo) for manual visual demo."
+    },
+    {
+      "id": "SLICE-2",
+      "title": "Log ingest 端到端 — cmd/log-ingester (OTLP receiver) + CH logs_v1 + /api/v1/logs + /logs page with cross-jump",
+      "priority": "P0",
+      "status": "proposed",
+      "current_state": "SLICE-1 done; trace vertical works (cmd/ingester → traces_v1 → cmd/query → /traces). No log ingest path; no CH logs_v1; no /api/v1/logs route; no /logs frontend; cmd/log-ingester binary does not exist. Drift D4 (Caddy + nginx duplicated routing) still open.",
+      "target_state": "SDK / telemetrygen-logs → cmd/log-ingester (OTLP/gRPC :4327 + OTLP/HTTP :4328 /v1/logs, Bearer-on-receiver) → CH logs_v1 (tenant-scoped, Row Policy active) → curl /api/v1/logs with structured filters via cmd/query :8081 → frontend /logs page with severity badges + cross-jump trace_id/span_id chips + JSON body pretty-print. /traces/:id gains a Logs subtab; clicking a span narrows to that span_id. Cross-tenant Go integration test (8 sub-assertions) asserts tenant B cannot see tenant A logs. Drift D4 closed: nginx /api blocks removed; Caddy becomes sole ingress.",
+      "acceptance_criteria": [
+        "cmd/log-ingester embeds otlpreceiver (gRPC :4327 + HTTP :4328 /v1/logs, IncludeMetadata: true on BOTH transports day 1); reads Authorization: Bearer <api-key>; resolves via auth.PGResolver; server-stamps tenant_id; drops SDK-declared tenant.id resource attribute; rejects missing/invalid with 401 + log_ingester_auth_{missing,invalid}_total counter",
+        "CH logs_v1 table created (tenant_id LowCardinality first; ts/observed_ts DateTime64(9); service/severity_text LowCardinality; severity_number UInt8; body String ZSTD(3); trace_id/span_id String with bloom_filter index; trace_flags UInt8; resource_attributes + attributes Map(LC(String),String); minmax index on severity_number); ORDER BY (tenant_id, service, ts); PARTITION BY (tenant_id, toYYYYMMDD(ts)); Row Policy tenant_isolation_logs_v1 attached",
+        "internal/logingest.LogConsumer writes batches via chquery.PrepareBatch (*chquery.Batch pins tenant_id at prepare time; first Append arg auto-validated); bodyAsString helper JSON-encodes Map/Slice bodies, AsString for primitives",
+        "GET /api/v1/logs on cmd/query :8081 with filters: service (repeated), severity (repeated), ts_from/ts_to (with +1s lookahead drift D1 mitigation), trace_id, span_id, body_contains (positionUTF8), limit/offset; response includes has_more via limit+1 trick; behind Caddy /api/v1/logs* handle",
+        "All Query + ingester SQL through chquery.Conn (auto-prepends tenant_id from ctx; never a client URL param); make lint-ch rejects bare clickhouse-go imports outside internal/chquery (already enforced; automatically covers new internal/logingest/ + internal/query/logs_*.go)",
+        "Row Policy tenant_isolation_logs_v1 enforces tenant_id = getSetting(custom_tenant_id) at CH level (defense-in-depth on top of MustTenantScope)",
+        "Frontend /logs page: list + expand-row JSON (JSON.parse pretty-print of body per packaging B); SeverityBadge component; filter bar (URL is source of truth); /traces/:id gains a Logs subtab via LogsPanel calling /api/v1/logs?trace_id=X; clicking a span in the waterfall narrows to ?trace_id=X&span_id=Y (per packaging B); reverse cross-jump: trace_id/span_id chips in log rows link to /traces/:trace_id?focus_span=Y",
+        "Cross-tenant E2E (build tag integration, backend/internal/logingest/cross_tenant_test.go): 8 sub-assertions — A→ingest counts match, B→list read denied, B→trace_id cross-jump denied, A→own trace_id read, A→span_id scoping, gRPC missing-Bearer 401, HTTP missing-Bearer 401 (regression — SLICE-1 T13 IncludeMetadata lesson), garbage-Bearer query 401",
+        "Per-OTLP-Export-call metering event written to PG metering_events with signal_type=log, count=records_in_batch; best-effort (CH commit returns OK regardless); log_ingester_metering_failed_total counter for PG failures",
+        "Routing consolidated to Caddy-only ingress (drift D4 closed): frontend/nginx.conf /api/* and /api/v1/traces* blocks removed; Caddy gets one new /api/v1/logs* handle; Vite dev proxy + Playwright baseURL repointed to https://localhost (ignoreHTTPSErrors); regression assertion in logs.spec.ts that http://localhost:13000/api/v1/logs returns 404. CI matrix updated: backend-unit (new internal/logingest + internal/query unit tests), backend-integration (new cross-tenant + chtest reuse), frontend-unit (new logs.test.ts + SeverityBadge.test.ts + LogRow.test.ts), e2e (new make seed-logs + logs.spec.ts); lint-ch unchanged"
+      ],
+      "out_of_scope": [
+        "Log retention / TTL (admin concern; SLICE-3+ when tenant settings UI lands)",
+        "Full-text body search via tokenbf_v1 / ngrambf_v1 index (revisit when query patterns are real)",
+        "Log↔trace bidirectional graph UI (ship cross-jump links + tabs, not a unified timeline view)",
+        "OTLP log events / structured normalization (treated as plain body + attributes in v1)",
+        "Log-based metrics / extracted spans (post-MVP)",
+        "Sampling decisions on logs (ingest 100% in v1)",
+        "AsyncInsert / column-mode batch on chquery.Batch (add when throughput data demands)",
+        "Cursor pagination on /api/v1/logs (offset paging ships with documented streaming-drift limitation, symmetric to SLICE-1)",
+        "Proactive 501 stubs for /api/v1/services|topology|alerts routes (future slices add their own one-line Caddy handle)",
+        "Real /api/v1/services endpoint for the filter bar (SLICE-3; SLICE-2 uses type-your-own or auto-suggest-from-recent placeholder)"
+      ],
+      "dependencies": [
+        "SLICE-1"
+      ],
+      "spec": "docs/specs/2026-05-26-slice-2-log-design.md",
+      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/2026-05-26-slice-2-plan.md)",
+      "estimated_effort_days": "12",
+      "owner": "@huangbaixun",
+      "notes": "Second vertical slice. Same Bearer-on-receiver pattern as SLICE-1; binary split (new cmd/log-ingester) decided this session — symmetric to PRE-2 cmd/query split for independent blast radius. Internal package refactor: extract internal/ingestshared/ (admin, auth, host, metering, metrics) so internal/ingest/ stays trace-only and new internal/logingest/ stays log-only. Drift D4 bundled: nginx /api blocks deleted, Caddy becomes sole ingress (closes 2026-05-26 lessons-learned D4). Packaging B chosen — adds span-granularity scoping (?span_id=X) and JSON body pretty-print on top of the minimal mirror-SLICE-1 baseline."
     }
   ]
 }
