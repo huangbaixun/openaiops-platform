@@ -100,6 +100,19 @@ ports: ["127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080"]
 
 **Fix path**：CI backend job 末尾加一步 `goose down` + 再 `goose up` 验证 idempotent。
 
+### D4 · nginx `/api/v1/traces*` 双写：Caddy+nginx 路由碎片化（SLICE-1 开的债，SLICE-2 还清）
+
+**症状**：SLICE-1 T16 Playwright 发现，SPA 从前端宿主端口（13000）访问 `/api/v1/traces*` 时，nginx 没有对应的 proxy block，返回 404。Caddy（443）有这条路由，但 nginx 只代理 `/api/` → gateway。修法是在 nginx.conf 里补了一条 `/api/v1/traces` location，使得 Caddy 与 nginx 路由双份维护。
+
+**根因**：query 服务（:8081）是 SLICE-1 新增的第二个后端。原有 nginx 设计只知道 gateway（:8080）。每新增一个 query-side 路由，就需要同步修改 Caddy 和 nginx 两处 —— 高度脆弱。
+
+**Resolution（SLICE-2 T8，2026-05-26）**：
+- `frontend/nginx.conf` 中 `/api/*` 和 `/api/v1/traces*` location 块**全部删除**。nginx 现在只做 SPA fallback（`try_files $uri $uri/ /index.html`）。
+- Caddy 是 `/api/*` 的唯一入口：一个 `handle /api/v1/logs*` + 一个 `handle /api/v1/traces*` + 一个 `handle /api/*`（gateway fallback）。
+- Vite dev proxy 和 Playwright `baseURL` 均已指向 `https://localhost`（Caddy），不再依赖 nginx 的 proxy 能力。
+- **回归断言**：`frontend/e2e/logs.spec.ts` 测试 #4 断言 `http://localhost:<frontend-port>/api/v1/logs` 返回的 `Content-Type` 是 `text/html`（SPA HTML），不含 `"items"` 字段（API JSON 特征）。如有人在 nginx.conf 里重新加 `/api` proxy block，这个测试会立刻报红。
+- **教训**：未来任何新 query-side 路由（services、topology、alerts…）只需在 `Caddyfile` 加一行 `handle /api/v1/xxx* { ... }`，**零 nginx 改动**。这是 SLICE-2 之后所有路由变更的标准做法。
+
 ## 四、过程观察（给下一轮 subagent execution 用）
 
 - **Reviewers 在非平凡代码里找到真 bug**（T1 fix loop、T9 端口飘）。两阶段 review（spec compliance → code quality）在 >50 行代码任务上值这个 round-trip；纯 scaffold 任务上价值低（可考虑合并为单 review）。

@@ -40,6 +40,14 @@
     {
       "date": "2026-05-26",
       "event": "SLICE-2 spec landed (docs/specs/2026-05-26-slice-2-log-design.md) — brainstormed binary split (cmd/log-ingester own ports 4327/4328/8083), first-class trace_id+span_id correlation, drift D4 routing consolidation, body substring via positionUTF8 (no text index), packaging B (span scoping + JSON pretty-print). 10 ACs. Next: writing-plans for docs/plans/2026-05-26-slice-2-plan.md."
+    },
+    {
+      "date": "2026-05-26",
+      "event": "SLICE-2 execution started — status proposed → building. Subagent-driven mode per docs/plans/2026-05-26-slice-2-plan.md (e1fafa0). 14 tasks; fresh implementer per task + 2-stage review (spec → code quality)."
+    },
+    {
+      "date": "2026-05-26",
+      "event": "SLICE-2 done — 14 tasks, all 10 ACs verified. Log vertical: cmd/log-ingester → CH logs_v1 (Row Policy) → /api/v1/logs → /logs page + /traces/:id Logs subtab. Drift D4 closed: nginx /api blocks deleted, Caddy sole ingress. Playwright D4 regression locks the architectural guard. 5 bugs caught during execution. See deploy/SLICE-2-evidence.txt."
     }
   ],
   "legend": {
@@ -159,7 +167,21 @@
       "id": "SLICE-2",
       "title": "Log ingest 端到端 — cmd/log-ingester (OTLP receiver) + CH logs_v1 + /api/v1/logs + /logs page with cross-jump",
       "priority": "P0",
-      "status": "proposed",
+      "status": "done",
+      "completed_at": "2026-05-26",
+      "evidence": {
+        "commits_range": "cda3fb8..<T14 SHA>",
+        "task_count": 14,
+        "ac_summary": "10/10 ACs verified. AC #2/#6 via CH migration apply + system.row_policies (tenant_isolation_logs_v1 confirmed). AC #1/#3/#5/#8 via Go unit + integration tests (TestSlice2_CrossTenantLogs 8 sub-assertions + TestLogsToRows unit tests). AC #4 via logs_handler_test + logs_repo_test + live curl (10 items returned, beta 0 items). AC #7 via Playwright logs.spec.ts (5/5 PASS in 3.0s) + vitest 52 tests PASS. AC #9 via TestSlice2_MeteringSignalLog integration test (signal_type='log' confirmed). AC #10 via nginx.conf /api blocks deleted + Playwright D4 regression assertion (Content-Type: text/html, no 'items' key) + CI matrix updated.",
+        "evidence_file": "deploy/SLICE-2-evidence.txt",
+        "bugs_caught_during_execution": [
+          "T2 — ingestshared extraction: cmd/ingester imported internal/ingest directly; refactor required careful dep-graph pruning to avoid circular import.",
+          "T5 — bodyAsString for plog.ValueTypeMap returned Go-syntax string via .AsString(); needed JSON marshal. Test coverage added for all 6 value type branches.",
+          "T7 — body_contains filter used LIKE initially; spec requires positionUTF8. Caught in review; fixed before merge.",
+          "T9/T10 — LogsPanel double-fetch: apply()→router.replace→watch→load() double-fetch loop. Fixed by suppressNextWatch flag pattern (same as TracesList). Caught in T9 review.",
+          "T11 — Cross-tenant sub2/sub3 passed vacuously: ingest call was inside t.Run for sub1, so sub2/sub3 had no data to deny. Fixed by hoisting ingest before all t.Runs (commit 7ce9741)."
+        ]
+      },
       "current_state": "SLICE-1 done; trace vertical works (cmd/ingester → traces_v1 → cmd/query → /traces). No log ingest path; no CH logs_v1; no /api/v1/logs route; no /logs frontend; cmd/log-ingester binary does not exist. Drift D4 (Caddy + nginx duplicated routing) still open.",
       "target_state": "SDK / telemetrygen-logs → cmd/log-ingester (OTLP/gRPC :4327 + OTLP/HTTP :4328 /v1/logs, Bearer-on-receiver) → CH logs_v1 (tenant-scoped, Row Policy active) → curl /api/v1/logs with structured filters via cmd/query :8081 → frontend /logs page with severity badges + cross-jump trace_id/span_id chips + JSON body pretty-print. /traces/:id gains a Logs subtab; clicking a span narrows to that span_id. Cross-tenant Go integration test (8 sub-assertions) asserts tenant B cannot see tenant A logs. Drift D4 closed: nginx /api blocks removed; Caddy becomes sole ingress.",
       "acceptance_criteria": [

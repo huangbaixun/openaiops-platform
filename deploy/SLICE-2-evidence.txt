@@ -1,0 +1,147 @@
+# SLICE-2 AC evidence — captured 2026-05-26
+
+## Tasks delivered
+
+T1  — CH logs_v1 migration + Row Policy (cda3fb8)
+T2  — internal/ingestshared/ extraction (auth, admin, host, metering, metrics) (a6f17ce, b30ead0)
+T3  — cmd/log-ingester scaffold + 3-binary compose config (c16d7fd)
+T4  — otlpreceiver Logs skeleton + LogConsumer wired (725dc41)
+T5  — logsToRows + bodyAsString + full ConsumeLogs pipeline (9d1f5fe)
+T6  — metering integration test for signal_type='log' (8c42b75)
+T7  — GET /api/v1/logs handler + repo with filters (cc607f3)
+T8  — log-ingester compose + Caddy /api/v1/logs + drift D4 routing fix (c8a6e71)
+T9  — /logs page + LogRow + SeverityBadge + api client + i18n (b0bebd6)
+T10 — /traces/:id Logs subtab + LogsPanel + span-click + focus_span deep-link (90f7153)
+T11 — cross-tenant E2E for logs — 8 sub-assertions (ceb4cbd)
+T12 — CI matrix update: backend-unit + backend-integration (logingest) + frontend-unit (e2e logs) (tagged separately in CI)
+T13 — cmd/seed-logs + make seed-logs + make demo-logs (44c8fea)
+T14 — Playwright e2e + drift D4 regression + AC verification + SLICE-2 done (THIS COMMIT)
+
+## AC coverage
+
+AC #1 — cmd/log-ingester embeds otlpreceiver (gRPC :4327 + HTTP :4328); Bearer-on-receiver;
+          resolves via auth.PGResolver; server-stamps tenant_id; drops SDK tenant.id; rejects
+          missing/invalid Bearer with 401 + log_ingester_auth_{missing,invalid}_total counter.
+  Evidence: backend/internal/logingest/cross_tenant_test.go TestSlice2_CrossTenantLogs
+            sub6 "grpc no bearer unauthenticated" PASS
+            sub7 "http no bearer 401 regression" PASS
+            sub8 "garbage bearer 401" PASS
+            curl -sk -o /dev/null -w '%{http_code}' https://localhost/api/v1/logs → 401 (no Bearer)
+            sub1 "A ingest grpc 3 logs recorded" PASS (server-stamp confirmed)
+
+AC #2 — CH logs_v1 schema correct; Row Policy attached.
+  Evidence: SHOW CREATE TABLE openaiops.logs_v1:
+              tenant_id LowCardinality(String) [first column]
+              ORDER BY (tenant_id, service, ts)
+              PARTITION BY (tenant_id, toYYYYMMDD(ts))
+              INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 4
+              INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 4
+              INDEX idx_severity severity_number TYPE minmax GRANULARITY 4
+            SELECT name FROM system.row_policies WHERE table='logs_v1':
+              → tenant_isolation_logs_v1 ON openaiops.logs_v1
+
+AC #3 — internal/logingest.LogConsumer writes batches via chquery.PrepareBatch;
+          tenant_id pinned at prepare time; bodyAsString JSON-encodes structured bodies.
+  Evidence: TestSlice2_CrossTenantLogs sub1 "A ingest grpc 3 logs recorded" PASS
+            TestLogsToRows_HappyPath + TestBodyAsString_PrimitivesAndMap (unit tests) PASS
+
+AC #4 — GET /api/v1/logs on cmd/query :8081 with all required filters; behind Caddy /api/v1/logs*.
+  Evidence: curl -sk -H 'Authorization: Bearer test-key-acme' 'https://localhost/api/v1/logs?limit=20'
+              → {"items":[10 records],"has_more":false}  (10 records from 2 seed runs)
+            TestSlice2_CrossTenantLogs sub3 "B trace_id filter empty" PASS
+                                       sub4 "A trace_id filter 3 rows" PASS
+                                       sub5 "A trace and span_id filter" PASS
+            backend/internal/query/logs_handler_test.go + logs_repo_test.go PASS
+
+AC #5 — All Query + ingester SQL through chquery.Conn; make lint-ch rejects bare imports.
+  Evidence: make lint-ch → "lint-no-bare-ch: OK (backend/internal/query backend/internal/ingest
+            backend/cmd clean)"
+
+AC #6 — Row Policy tenant_isolation_logs_v1 enforces tenant_id = getSetting(custom_tenant_id).
+  Evidence: system.row_policies: tenant_isolation_logs_v1 ON openaiops.logs_v1
+            TestSlice2_CrossTenantLogs sub2 "B sees empty list" PASS
+                                       sub3 "B trace_id filter empty" PASS
+            Beta tenant query: curl -sk -H 'Authorization: Bearer test-key-beta'
+              'https://localhost/api/v1/logs?limit=20' → {"items":[],"has_more":false}
+
+AC #7 — Frontend /logs page (list + expand JSON + SeverityBadge + filter bar); /traces/:id
+          Logs subtab via LogsPanel; trace_id/span_id chips cross-jump; URL is source of truth.
+  Evidence: Playwright frontend/e2e/logs.spec.ts: 5 specs PASS in 3.0s
+              ✓ acme: /logs renders seeded rows including FATAL severity
+              ✓ acme: clicking trace_id chip in log row navigates to /traces/:id
+              ✓ acme: Logs subtab on /traces/:id shows scoped log rows
+              ✓ D4 regression: frontend port /api/v1/logs does NOT proxy to backend
+              ✓ beta: /logs shows empty state (cross-tenant isolation)
+            vitest: 8 test files, 52 tests PASS (incl. LogRow, LogsPanel, SeverityBadge, LogsView)
+
+AC #8 — Cross-tenant Go integration test (8 sub-assertions).
+  Evidence: backend/internal/logingest/cross_tenant_test.go TestSlice2_CrossTenantLogs:
+              ✓ sub1 A ingest grpc 3 logs recorded
+              ✓ sub2 B sees empty list
+              ✓ sub3 B trace_id filter empty
+              ✓ sub4 A trace_id filter 3 rows
+              ✓ sub5 A trace and span_id filter
+              ✓ sub6 grpc no bearer unauthenticated
+              ✓ sub7 http no bearer 401 regression (SLICE-1 IncludeMetadata lesson applied day-1)
+              ✓ sub8 garbage bearer 401
+
+AC #9 — Per-OTLP-Export-call metering event, signal_type='log'.
+  Evidence: backend/internal/logingest/metering_integration_test.go TestSlice2_MeteringSignalLog:
+              ✓ metering_events row exists with signal_type=log
+              ✓ metering_events count equals log record count
+              ✓ no cross-signal bleed: signal_type=trace count is zero
+
+AC #10 — Routing consolidated to Caddy-only ingress (drift D4 closed); CI matrix updated.
+  Evidence: frontend/nginx.conf — ONLY has SPA fallback; /api/* and /api/v1/traces* location
+            blocks deleted on 2026-05-26. Comment in nginx.conf documents the deletion.
+            Playwright test #4 (D4 regression):
+              http://localhost:13000/api/v1/logs → 200 with Content-Type: text/html (SPA fallback,
+              NOT backend JSON). body does not contain "items" key from API shape.
+            https://localhost/api/v1/logs → 200 JSON (through Caddy) with valid Bearer.
+            https://localhost/api/v1/logs → 401 without Bearer.
+            CI matrix: ci.yml backend-integration job runs logingest cross_tenant + metering tests
+            with -tags=integration -timeout=240s.
+
+## Verification command summary (2026-05-26 session)
+
+  $ make lint-ch                       → lint-no-bare-ch: OK (clean)
+  $ cd backend && go test -count=1 -tags=integration -timeout=240s ./internal/logingest/...
+                                       → 22 sub-tests PASS (TestLogsToRows, TestBodyAsString,
+                                          TestSlice2_MeteringSignalLog, TestSlice2_CrossTenantLogs)
+  $ cd frontend && npx vitest run      → 8 test files, 52 tests PASS in 2.11s
+  $ cd frontend && npx playwright test e2e/logs.spec.ts
+                                       → 5 passed (3.0s)
+  $ cd frontend && npx playwright test e2e/traces.spec.ts
+                                       → 4 passed (3.1s, after fixing traces.spec.ts BASE URL
+                                          to use playwright.config.ts baseURL — port 3000 was
+                                          intercepted by OrbStack on this machine; relative paths
+                                          now go through Caddy at https://localhost)
+
+## Known drift / open follow-ups (do NOT block SLICE-2 done)
+
+D1 — ts upper-bound rounding (SLICE-1 legacy, partially mitigated in SLICE-2 T7 with +1s
+     lookahead). Still a UX edge-case on very fast refresh. Tracked since SLICE-1.
+
+D2 — migrate service installs goose from network at every compose-up. Pre-bake deferred.
+
+D3 — cmd/seed-traces doesn't auto-discover non-default port. Manual env var needed.
+     On this dev machine: INGESTER_OTLP_GRPC_HOST_PORT=14317 (SignOz collision, see .env).
+
+D5 (new) — traces.spec.ts used `BASE = http://localhost:3000` which was intercepted by
+     OrbStack on this machine. Fixed in T14 to use relative paths (playwright.config.ts
+     baseURL = https://localhost). traces.spec.ts now passes 4/4. Future E2E specs MUST
+     use relative paths (page.goto('/foo')) and rely on playwright.config.ts baseURL.
+
+## Bugs caught during SLICE-2 execution (T1–T13)
+
+1. T2 — ingestshared extraction discovered that cmd/ingester imported internal/ingest directly;
+         refactor required careful dep-graph pruning to avoid circular import.
+2. T5 — bodyAsString for plog.ValueTypeMap required JSON marshalling; plain .AsString() returned
+         a Go-syntax string. Test coverage added for all 6 value type branches.
+3. T7 — /api/v1/logs filter `body_contains` used LIKE initially; spec says positionUTF8.
+         Caught in review; fixed before merge.
+4. T9/T10 — LogsPanel double-fetch: apply() pushes URL → watch fires → second fetch. Fixed by
+             suppressNextWatch flag (same pattern as TracesList). Caught in T9 review.
+5. T11 — Cross-tenant sub-test sub2/sub3 passed vacuously before T11 review fix: ingest was
+          inside t.Run for sub1, so later sub-tests had no data to deny. Fixed by hoisting
+          ingest before all t.Runs (commit 7ce9741).

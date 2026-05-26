@@ -3,7 +3,7 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-26",
   "active_branch": "main",
-  "current_focus": "SLICE-1 complete (16 tasks, 27 commits, all 10 ACs verified). Stack runs end-to-end: hot-r.o.d. → ingester → CH → query → Vue /traces. Cross-tenant E2E test gates AC #8 with 8 sub-assertions (6 AC + 2 HTTP-transport regression). Three real bugs caught during execution: ingester IncludeMetadata missing on both transports (fixed T10+T13); migration replay-safety via IF NOT EXISTS (fixed T1); frontend nginx not mirroring Caddy /api/v1/traces split (fixed T16). Two product-drift items deferred to SLICE-2 prep: list ts upper-bound rounding (drift D1) and seed-traces port auto-discovery (drift D3). Next: SLICE-2 (log ingest) brainstorming — same Bearer-on-receiver pattern, may converge log + trace ingester to one binary.",
+  "current_focus": "SLICE-2 complete (14 tasks, all 10 ACs verified). Log vertical: log-ingester (4327/4328) → CH logs_v1 → /api/v1/logs → /logs page + cross-jump from /traces. Drift D4 closed: Caddy is sole ingress, nginx /api blocks removed; Playwright D4 regression assertion locks it. internal/ingestshared/ extracted for both ingesters to reuse. Next: SLICE-3 brainstorming (services + topology).",
   "open_tasks": [],
   "recently_completed": [
     {
@@ -17,6 +17,12 @@
       "name": "SLICE-1 — Trace ingest end-to-end",
       "summary": "telemetrygen / hot-r.o.d. → cmd/ingester (OTel otlpreceiver embed, Bearer-on-receiver auth, drops SDK tenant.id) → CH traces_v1 with Row Policy → cmd/query :8081 list+detail → Vue /traces with hand-rolled SVG waterfall. 16 tasks, ~27 commits (incl. review-driven fixes). 8/10 ACs verified by automated tests; AC #2 + AC #6 verified by migrate-ch-up stdout + system.row_policies; AC #7 verified by Playwright. Three real bugs caught: ingester IncludeMetadata missing on both gRPC and HTTP transports; CH migration replay-safety required IF NOT EXISTS on both DDLs; frontend nginx only proxied /api/* to gateway (caught by T16 Playwright when SPA-side /api/v1/traces returned 404 — fixed by mirroring Caddy's split into nginx.conf). New shared chtest package landed under internal/chquery/chtest for future integration tests.",
       "evidence": "deploy/SLICE-1-evidence.txt + commits 0fb9a97..<T16 SHA>"
+    },
+    {
+      "date": "2026-05-26",
+      "name": "SLICE-2 — Log ingest end-to-end",
+      "summary": "SDK / telemetrygen-logs → cmd/log-ingester (OTel otlpreceiver embed, gRPC :4327 + HTTP :4328, Bearer-on-receiver auth, IncludeMetadata applied on both transports day-1 per SLICE-1 lesson) → CH logs_v1 with Row Policy → GET /api/v1/logs on cmd/query :8081 with full filter suite → Vue /logs page (SeverityBadge + LogRow expand + filter bar + URL source-of-truth) + /traces/:id Logs subtab (LogsPanel, span-click scoping). 14 tasks. Drift D4 closed: nginx /api blocks deleted; Caddy is sole ingress; Playwright test #4 locks the architectural assertion. internal/ingestshared/ extracted for both ingesters to reuse. Five bugs caught: circular import during shared extraction; bodyAsString Map-type needed JSON not Go-syntax; body_contains used LIKE not positionUTF8; LogsPanel double-fetch via suppressNextWatch; cross_tenant sub2/3 passed vacuously due to ingest-inside-t.Run. All 10 ACs verified: AC #2/#6 via CH schema + system.row_policies; AC #1/#3/#5/#8 via Go integration tests (22 sub-tests); AC #4 via handler/repo unit tests + curl; AC #7 via Playwright 5/5 + vitest 52/52; AC #9 via metering integration test; AC #10 via nginx.conf deletion + D4 regression Playwright assertion.",
+      "evidence": "deploy/SLICE-2-evidence.txt + commits cda3fb8..<T14 SHA>"
     }
   ],
   "notes": [
@@ -38,7 +44,17 @@
     {
       "date": "2026-05-26",
       "kind": "lesson",
-      "note": "SLICE-1 T16 caught a Slice-0 regression: frontend nginx.conf only forwards /api/* → gateway. Once a second query backend appeared at :8081 (cmd/query), the SPA on the frontend host port could not reach it — /api/v1/traces returned nginx 404. Caddy at 443 had the split but nginx at 13000 (frontend host) did not. Fix duplicates the rule in two places, which is fragile. SLICE-2 should either consolidate routing into one component or eliminate the nginx hop entirely. Tracked as drift D4."
+      "note": "SLICE-1 T16 caught a Slice-0 regression: frontend nginx.conf only forwards /api/* → gateway. Once a second query backend appeared at :8081 (cmd/query), the SPA on the frontend host port could not reach it — /api/v1/traces returned nginx 404. Fix duplicated the rule in two places, which is fragile. SLICE-2 T8 resolved this properly: nginx /api blocks deleted entirely; Caddy is now the sole ingress. New query-side routes only need a one-line Caddy handle — zero nginx changes. Drift D4 closed."
+    },
+    {
+      "date": "2026-05-26",
+      "kind": "lesson",
+      "note": "SLICE-2 T14: Playwright E2E specs must use relative paths (page.goto('/foo')) and rely on playwright.config.ts baseURL = https://localhost (Caddy ingress). Never hardcode a port-based BASE constant — local machines may have that port intercepted by OrbStack or other tools. traces.spec.ts was updated in T14 to remove the hardcoded BASE = http://localhost:3000. All future E2E specs follow the logs.spec.ts pattern."
+    },
+    {
+      "date": "2026-05-26",
+      "kind": "lesson",
+      "note": "SLICE-2 cross_tenant sub2/sub3 passed vacuously before T11 review fix: the ingest call was inside t.Run for sub1, so if sub1 ran correctly but sub2/3 got no data, they trivially passed. Always hoist shared setup (ingest calls, schema seeding) outside t.Run blocks to ensure later sub-tests actually exercise the deny-path with real data."
     }
   ],
   "known_drift": [
@@ -62,21 +78,15 @@
     },
     {
       "date": "2026-05-26",
-      "item": "List ts upper-bound uses `time.Now().UTC()` with strict `ts < ?`. clickhouse-go Time-param rounding excludes spans written within ~1s of 'now'. UI list refresh in first second after ingest = empty. Workaround: SLICE-2 should add a small lookahead (e.g., now + 1s) or switch to `ts <=` semantics.",
+      "item": "List ts upper-bound uses `time.Now().UTC()` with +1s lookahead (drift D1 mitigation added in SLICE-2 T7). Still an edge-case: if the query backend clock and ingester clock drift >1s, very recent records may still miss the window. Full fix is `ts <=` semantics or a configurable lookahead.",
       "severity": "low",
-      "tracked_in": "SLICE-1 T13 implementer note + SLICE-1-evidence.txt D1"
+      "tracked_in": "SLICE-1 T13 implementer note + SLICE-1-evidence.txt D1 + SLICE-2 T7 mitigation"
     },
     {
       "date": "2026-05-26",
-      "item": "cmd/seed-traces honors INGESTER_OTLP_GRPC_HOST_PORT but doesn't auto-discover. Manual --target flag is the workaround.",
+      "item": "cmd/seed-traces honors INGESTER_OTLP_GRPC_HOST_PORT but doesn't auto-discover. Manual env var needed on machines with port collisions (e.g., this dev machine uses 14317 due to .env override).",
       "severity": "low",
-      "tracked_in": "SLICE-1-evidence.txt D3"
-    },
-    {
-      "date": "2026-05-26",
-      "item": "Routing for /api/v1/traces* is duplicated in deploy/Caddyfile (443 ingress) and frontend/nginx.conf (frontend host port). Adding a new query-side route (logs, services, topology in later slices) requires updating both — fragile. SLICE-2 should either consolidate routing into a single component or remove the nginx hop entirely.",
-      "severity": "medium",
-      "tracked_in": "SLICE-1-evidence.txt D4"
+      "tracked_in": "SLICE-1-evidence.txt D3 + SLICE-2-evidence.txt D3"
     }
   ],
   "open_questions": [
@@ -111,6 +121,11 @@
       "date": "2026-05-26",
       "q": "SLICE-1-PREP-1: chquery.Conn batch-insert support",
       "decision": "Resolved by extending chquery.Conn.PrepareBatch with a *chquery.Batch wrapper (commit 1a00986). Tenant_id pinned at PrepareBatch time and verified on each Append; CH Row Policy is layer-2 backstop. Smoke test TestSmoke_BatchTenantIsolation proves tenant-A-writes / tenant-B-reads = 0."
+    },
+    {
+      "date": "2026-05-26",
+      "q": "SLICE-2 D4: should nginx be kept with dual-write routing or eliminated?",
+      "decision": "Eliminated nginx /api routing entirely (SLICE-2 T8). nginx.conf now has only the SPA fallback (try_files). Caddy at :443 is the sole API ingress. Future query routes (services, topology) only need one-line Caddy handles — zero nginx changes. Regression locked by Playwright test #4 in logs.spec.ts."
     }
   ]
 }
