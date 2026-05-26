@@ -59,5 +59,6 @@ export default {
     tab: 'Logs',
     scopedToSpan: 'Showing span-scoped logs only',
     showAll: 'Show all logs for this trace',
+    errorTitle: 'Failed to load logs',
   },
 }

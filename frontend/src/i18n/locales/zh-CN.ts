@@ -59,5 +59,6 @@ export default {
     tab: '日志',
     scopedToSpan: '当前仅显示 span 范围日志',
     showAll: '显示该调用链全部日志',
+    errorTitle: '加载日志失败',
   },
 }
