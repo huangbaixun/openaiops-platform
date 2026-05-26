@@ -44,4 +44,20 @@ export default {
     tabJSON: 'JSON',
     tabServiceMap: '服务地图',
   },
+  logs: {
+    title: '日志',
+    empty: '暂无日志',
+    hasMore: '还有更多结果，请细化筛选或翻页',
+    filter: {
+      service: '服务',
+      severity: '级别',
+      traceId: 'Trace ID',
+      spanId: 'Span ID',
+      body: '正文包含…',
+      apply: '应用',
+    },
+    tab: '日志',
+    scopedToSpan: '当前仅显示 span 范围日志',
+    showAll: '显示该调用链全部日志',
+  },
 }

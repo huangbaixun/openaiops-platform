@@ -44,4 +44,20 @@ export default {
     tabJSON: 'JSON',
     tabServiceMap: 'Service Map',
   },
+  logs: {
+    title: 'Logs',
+    empty: 'No logs in the selected window',
+    hasMore: 'More results — refine filters or load next page',
+    filter: {
+      service: 'Service',
+      severity: 'Severity',
+      traceId: 'Trace ID',
+      spanId: 'Span ID',
+      body: 'Body contains…',
+      apply: 'Apply',
+    },
+    tab: 'Logs',
+    scopedToSpan: 'Showing span-scoped logs only',
+    showAll: 'Show all logs for this trace',
+  },
 }

@@ -6,7 +6,7 @@ const items: { key: string; label: string; to: string | null }[] = [
   { key: 'overview', label: 'nav.overview', to: null },
   { key: 'services', label: 'nav.services', to: null },
   { key: 'traces', label: 'nav.traces', to: '/traces' },
-  { key: 'logs', label: 'nav.logs', to: null },
+  { key: 'logs', label: 'nav.logs', to: '/logs' },
   { key: 'topology', label: 'nav.topology', to: null },
   { key: 'alerts', label: 'nav.alerts', to: null },
   { key: 'settings', label: 'nav.settings', to: null },

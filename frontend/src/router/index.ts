@@ -22,6 +22,11 @@ const router = createRouter({
           component: () => import('../views/Traces/TraceDetail.vue'),
           props: true,
         },
+        {
+          path: 'logs',
+          name: 'logs',
+          component: () => import('../views/Logs/LogsView.vue'),
+        },
       ],
     },
   ],
