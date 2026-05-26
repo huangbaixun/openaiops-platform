@@ -3,6 +3,7 @@ package logingest
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -109,7 +110,8 @@ func bodyAsString(v pcommon.Value) string {
 	case pcommon.ValueTypeMap, pcommon.ValueTypeSlice:
 		b, err := json.Marshal(v.AsRaw())
 		if err != nil {
-			return ""
+			// Marshal-failure case is visible in CH rather than silently empty.
+			return fmt.Sprintf("<marshal error: %v>", err)
 		}
 		return string(b)
 	default:

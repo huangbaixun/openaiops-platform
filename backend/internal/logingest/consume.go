@@ -14,10 +14,19 @@ import (
 	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
 )
 
+// signalLog is the prometheus label value for log-signal counters.
+// Single source of truth for the three call sites below.
+const signalLog = "log"
+
 const insertLogsV1Stmt = `INSERT INTO logs_v1 (
     tenant_id, ts, observed_ts, service, severity_text, severity_number,
     body, trace_id, span_id, trace_flags, resource_attributes, attributes
 ) VALUES`
+
+// NOTE: latency observability (BatchDuration histogram) is intentionally
+// deferred — SLICE-2 spec AC #1 + #3 cover behavior, not latency. When p99
+// goes into an SLO, mirror ingest.Metrics by adding a logingest.Metrics
+// wrapper around *ingestshared.BaseMetrics with a *prometheus.HistogramVec.
 
 // LogConsumer is the consumer.Logs impl wired into the OTLP receiver.
 // Pipeline: Bearer extract → auth.Resolver → server-stamp tenant_id →
@@ -40,12 +49,12 @@ func (c *LogConsumer) Capabilities() consumer.Capabilities {
 func (c *LogConsumer) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	bearer, err := ingestshared.ExtractBearer(ctx)
 	if err != nil {
-		c.metrics.AuthMissing.WithLabelValues("log").Inc()
+		c.metrics.AuthMissing.WithLabelValues(signalLog).Inc()
 		return status.Error(codes.Unauthenticated, "missing bearer")
 	}
 	_, tn, err := c.resolver.ResolveBearer(ctx, bearer)
 	if err != nil {
-		c.metrics.AuthInvalid.WithLabelValues("log").Inc()
+		c.metrics.AuthInvalid.WithLabelValues(signalLog).Inc()
 		return status.Error(codes.Unauthenticated, "invalid bearer")
 	}
 	ctx = auth.WithTenant(ctx, tn.ID, tn.Name)
@@ -76,7 +85,7 @@ func (c *LogConsumer) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	if c.metering != nil {
 		c.metering.Enqueue(ingestshared.MeteringEvent{
 			TenantID:   tn.ID,
-			SignalType: "log",
+			SignalType: signalLog,
 			Count:      len(rows),
 		})
 	}
