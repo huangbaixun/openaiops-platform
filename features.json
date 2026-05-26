@@ -158,7 +158,7 @@
         "PRE-3"
       ],
       "spec": "docs/specs/2026-05-25-slice-1-trace-design.md",
-      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/2026-05-25-slice-1-plan.md)",
+      "plan": "docs/plans/2026-05-25-slice-1-plan.md",
       "estimated_effort_days": "21",
       "owner": "@huangbaixun",
       "notes": "First vertical slice (Path B). Spec landed 2026-05-25 after brainstorming session; 4 ACs evolved (see acceptance_criteria entries tagged [evolved ...]). Brainstorming closed open task SLICE-1-PREP-1 (chquery.Conn batch path) by deciding to extend the wrapper rather than open a lint exception — implementation tracked in spec §4. Per Slice 0 plan §5 + lessons (docs/lessons-learned-2026-05-24.md): apply Slice 0 NaiveUI test-selector + nginx /api proxy discipline + Go-version pinning. Plan to use telemetrygen for CI determinism + hot-r.o.d. (--profile demo) for manual visual demo."
@@ -212,7 +212,7 @@
         "SLICE-1"
       ],
       "spec": "docs/specs/2026-05-26-slice-2-log-design.md",
-      "plan": "(to be written via /harness:writing-plans — should produce docs/plans/2026-05-26-slice-2-plan.md)",
+      "plan": "docs/plans/2026-05-26-slice-2-plan.md",
       "estimated_effort_days": "12",
       "owner": "@huangbaixun",
       "notes": "Second vertical slice. Same Bearer-on-receiver pattern as SLICE-1; binary split (new cmd/log-ingester) decided this session — symmetric to PRE-2 cmd/query split for independent blast radius. Internal package refactor: extract internal/ingestshared/ (admin, auth, host, metering, metrics) so internal/ingest/ stays trace-only and new internal/logingest/ stays log-only. Drift D4 bundled: nginx /api blocks deleted, Caddy becomes sole ingress (closes 2026-05-26 lessons-learned D4). Packaging B chosen — adds span-granularity scoping (?span_id=X) and JSON body pretty-print on top of the minimal mirror-SLICE-1 baseline."

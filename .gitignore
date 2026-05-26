@@ -2,6 +2,9 @@
 /backend/gateway
 /backend/query
 /backend/ingester
+/backend/log-ingester
+/backend/seed-traces
+/backend/seed-logs
 /backend/*.test
 /backend/coverage.out
 /backend/coverage.html
@@ -31,3 +34,6 @@
 /deploy/data/
 /deploy/caddy_data/
 /deploy/caddy_config/
+
+# Harness telemetry sidecar
+/docs/agent-telemetry.jsonl
