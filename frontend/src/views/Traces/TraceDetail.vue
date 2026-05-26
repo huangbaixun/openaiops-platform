@@ -57,7 +57,7 @@ function clearSpan() {
 
         <NTabPane name="logs" :tab="t('logs.tab')">
           <LogsPanel
-            :trace-id="(route.params.traceId as string)"
+            :trace-id="props.traceId"
             :span-id="selectedSpanId"
             @clear-span="clearSpan"
           />
