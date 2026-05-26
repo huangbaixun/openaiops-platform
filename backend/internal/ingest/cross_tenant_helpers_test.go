@@ -45,6 +45,7 @@ import (
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery/chtest"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/ingest"
+	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/query"
 )
 
@@ -196,8 +197,10 @@ func bringUpIngestAndQuery(t *testing.T) *ingestEnv {
 	require.NoError(t, err)
 
 	resolver := auth.NewPGResolver(pgPool)
-	metrics := ingest.NewMetrics(prometheus.NewRegistry())
-	metering := ingest.NewMetering(pgPool, metrics)
+	reg := prometheus.NewRegistry()
+	base := ingestshared.NewBaseMetrics(reg, "trace")
+	metrics := ingest.NewMetrics(reg, base)
+	metering := ingestshared.NewMetering(pgPool, base, "trace")
 	consumer := ingest.NewConsumer(resolver, chConn, metering, metrics)
 
 	grpcAddr := pickPort(t)
@@ -208,7 +211,7 @@ func bringUpIngestAndQuery(t *testing.T) *ingestEnv {
 		HTTPAddr: httpAddr,
 	}, consumer)
 	require.NoError(t, err)
-	require.NoError(t, rcvr.Start(context.Background(), ingest.NewHost()))
+	require.NoError(t, rcvr.Start(context.Background(), ingestshared.NewHost()))
 
 	qrouter := query.NewRouter(resolver, chConn)
 	qsrv := httptest.NewServer(qrouter)

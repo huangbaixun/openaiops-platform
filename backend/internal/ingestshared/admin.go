@@ -1,4 +1,4 @@
-package ingest
+package ingestshared
 
 import (
 	"net/http"
@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// AdminHandler serves /livez, /healthz, and /metrics on the ingester's admin port.
+// AdminHandler returns the /healthz /livez /metrics mux used by both ingesters.
 //
 // SECURITY: this handler has no auth. /metrics exposes the default Prometheus
 // registry, including Go runtime metrics that may reveal memory + goroutine

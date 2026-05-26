@@ -12,6 +12,7 @@ import (
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
+	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
 )
 
 const insertTracesV1Stmt = `INSERT INTO traces_v1 (
@@ -25,11 +26,11 @@ const insertTracesV1Stmt = `INSERT INTO traces_v1 (
 type Consumer struct {
 	resolver auth.Resolver
 	ch       *chquery.Conn
-	metering *Metering // nil-safe; Task 6 wires real impl
+	metering *ingestshared.Metering // nil-safe
 	metrics  *Metrics
 }
 
-func NewConsumer(resolver auth.Resolver, ch *chquery.Conn, metering *Metering, metrics *Metrics) *Consumer {
+func NewConsumer(resolver auth.Resolver, ch *chquery.Conn, metering *ingestshared.Metering, metrics *Metrics) *Consumer {
 	return &Consumer{resolver: resolver, ch: ch, metering: metering, metrics: metrics}
 }
 
@@ -40,15 +41,15 @@ func (c *Consumer) Capabilities() consumer.Capabilities {
 func (c *Consumer) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
 	start := time.Now()
 
-	bearer, err := extractBearer(ctx)
+	bearer, err := ingestshared.ExtractBearer(ctx)
 	if err != nil {
-		c.metrics.AuthMissing.Inc()
+		c.metrics.Base.AuthMissing.WithLabelValues("trace").Inc()
 		c.metrics.BatchDuration.WithLabelValues("auth_missing").Observe(time.Since(start).Seconds())
 		return status.Error(codes.Unauthenticated, "missing bearer")
 	}
 	_, tn, err := c.resolver.ResolveBearer(ctx, bearer)
 	if err != nil {
-		c.metrics.AuthInvalid.Inc()
+		c.metrics.Base.AuthInvalid.WithLabelValues("trace").Inc()
 		c.metrics.BatchDuration.WithLabelValues("auth_invalid").Observe(time.Since(start).Seconds())
 		return status.Error(codes.Unauthenticated, "invalid bearer")
 	}
@@ -86,7 +87,11 @@ func (c *Consumer) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
 	c.metrics.SpansAccepted.WithLabelValues(tidStr, firstService(rows)).Add(float64(len(rows)))
 
 	if c.metering != nil {
-		c.metering.Enqueue(tn.ID, len(rows))
+		c.metering.Enqueue(ingestshared.MeteringEvent{
+			TenantID:   tn.ID,
+			SignalType: "trace",
+			Count:      len(rows),
+		})
 	}
 
 	c.metrics.BatchDuration.WithLabelValues("ok").Observe(time.Since(start).Seconds())

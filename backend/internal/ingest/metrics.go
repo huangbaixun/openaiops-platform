@@ -3,40 +3,37 @@ package ingest
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
 )
 
+// Metrics holds trace-ingester-specific counters plus a reference to the
+// shared base counters (auth + metering). consume.go calls Base.AuthMissing
+// etc. for the shared signals; SpansAccepted / SpansRejected / BatchDuration
+// remain trace-only.
 type Metrics struct {
-	AuthMissing    prometheus.Counter
-	AuthInvalid    prometheus.Counter
-	SpansAccepted  *prometheus.CounterVec
-	SpansRejected  *prometheus.CounterVec
-	MeteringFailed prometheus.Counter
-	BatchDuration  *prometheus.HistogramVec
+	Base          *ingestshared.BaseMetrics
+	SpansAccepted *prometheus.CounterVec
+	SpansRejected *prometheus.CounterVec
+	BatchDuration *prometheus.HistogramVec
 }
 
-// NewMetrics constructs Prometheus collectors against the provided Registerer.
-// Pass prometheus.DefaultRegisterer in production (so the admin /metrics handler
-// picks them up). Pass prometheus.NewRegistry() in tests to avoid
-// "duplicate metrics collector registration" panics when the test binary
-// constructs multiple Consumers.
-func NewMetrics(r prometheus.Registerer) *Metrics {
+// NewMetrics constructs trace-specific Prometheus collectors against r, and
+// records the shared base metrics (already registered by the caller via
+// ingestshared.NewBaseMetrics).
+// Pass prometheus.DefaultRegisterer in production (so the admin /metrics
+// handler picks them up). Pass prometheus.NewRegistry() in tests to avoid
+// "duplicate metrics collector registration" panics.
+func NewMetrics(r prometheus.Registerer, base *ingestshared.BaseMetrics) *Metrics {
 	f := promauto.With(r)
 	return &Metrics{
-		AuthMissing: f.NewCounter(prometheus.CounterOpts{
-			Name: "ingester_auth_missing_total",
-		}),
-		AuthInvalid: f.NewCounter(prometheus.CounterOpts{
-			Name: "ingester_auth_invalid_total",
-		}),
+		Base: base,
 		SpansAccepted: f.NewCounterVec(prometheus.CounterOpts{
 			Name: "ingester_spans_accepted_total",
 		}, []string{"tenant_id", "service"}),
 		SpansRejected: f.NewCounterVec(prometheus.CounterOpts{
 			Name: "ingester_spans_rejected_total",
 		}, []string{"reason"}),
-		MeteringFailed: f.NewCounter(prometheus.CounterOpts{
-			Name: "ingester_metering_failed_total",
-		}),
 		BatchDuration: f.NewHistogramVec(prometheus.HistogramOpts{
 			Name:    "ingester_batch_duration_seconds",
 			Buckets: prometheus.DefBuckets,

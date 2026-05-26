@@ -1,4 +1,4 @@
-package ingest
+package ingestshared
 
 import "go.opentelemetry.io/collector/component"
 
@@ -8,6 +8,6 @@ type nopHost struct{}
 
 func (nopHost) GetExtensions() map[component.ID]component.Component { return nil }
 
-// NewHost returns a minimal component.Host suitable for embedding the
-// otlpreceiver in a non-collector binary.
+// NewHost returns a minimal component.Host for embedding otlpreceiver in
+// a non-collector binary (test-package componenttest.NewNopHost is not for runtime use).
 func NewHost() component.Host { return nopHost{} }

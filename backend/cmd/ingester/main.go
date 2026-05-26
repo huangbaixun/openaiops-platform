@@ -19,6 +19,7 @@ import (
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/config"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/ingest"
+	"github.com/huangbaixun/openaiops-platform/backend/internal/ingestshared"
 )
 
 func main() {
@@ -56,8 +57,9 @@ func run(logger *slog.Logger) error {
 
 	resolver := auth.NewPGResolver(db)
 
-	metrics := ingest.NewMetrics(prometheus.DefaultRegisterer)
-	metering := ingest.NewMetering(db, metrics)
+	base := ingestshared.NewBaseMetrics(prometheus.DefaultRegisterer, "trace")
+	metrics := ingest.NewMetrics(prometheus.DefaultRegisterer, base)
+	metering := ingestshared.NewMetering(db, base, "trace")
 	defer metering.Close()
 	consumer := ingest.NewConsumer(resolver, ch, metering, metrics)
 	rcvr, err := ingest.NewOTLPReceiver(ingest.ReceiverConfig{
@@ -67,7 +69,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("otlp receiver build: %w", err)
 	}
-	if err := rcvr.Start(context.Background(), ingest.NewHost()); err != nil {
+	if err := rcvr.Start(context.Background(), ingestshared.NewHost()); err != nil {
 		return fmt.Errorf("otlp receiver start: %w", err)
 	}
 	logger.Info("ingester otlp listening", "grpc", cfg.IngesterOTLPGRPCAddr, "http", cfg.IngesterOTLPHTTPAddr)
@@ -75,7 +77,7 @@ func run(logger *slog.Logger) error {
 	// Admin server.
 	adminSrv := &http.Server{
 		Addr:              cfg.IngesterAdminAddr,
-		Handler:           ingest.AdminHandler(),
+		Handler:           ingestshared.AdminHandler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

@@ -1,4 +1,4 @@
-package ingest
+package ingestshared
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 func TestExtractBearer_FromMetadata(t *testing.T) {
 	md := client.NewMetadata(map[string][]string{"authorization": {"Bearer test-key-acme"}})
 	ctx := client.NewContext(context.Background(), client.Info{Metadata: md})
-	got, err := extractBearer(ctx)
+	got, err := ExtractBearer(ctx)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestExtractBearer_FromMetadata(t *testing.T) {
 
 func TestExtractBearer_Missing(t *testing.T) {
 	ctx := client.NewContext(context.Background(), client.Info{})
-	if _, err := extractBearer(ctx); err == nil {
+	if _, err := ExtractBearer(ctx); err == nil {
 		t.Fatal("expected error")
 	}
 }
@@ -29,7 +29,7 @@ func TestExtractBearer_Missing(t *testing.T) {
 func TestExtractBearer_NotBearerPrefix(t *testing.T) {
 	md := client.NewMetadata(map[string][]string{"authorization": {"Basic abc"}})
 	ctx := client.NewContext(context.Background(), client.Info{Metadata: md})
-	if _, err := extractBearer(ctx); err == nil {
+	if _, err := ExtractBearer(ctx); err == nil {
 		t.Fatal("expected error")
 	}
 }
