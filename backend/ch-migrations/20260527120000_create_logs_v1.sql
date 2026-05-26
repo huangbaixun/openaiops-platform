@@ -17,9 +17,11 @@ CREATE TABLE IF NOT EXISTS logs_v1 (
     INDEX idx_span_id   span_id         TYPE bloom_filter(0.01) GRANULARITY 4,
     INDEX idx_severity  severity_number TYPE minmax GRANULARITY 4
 ) ENGINE = MergeTree
+-- Partition ceiling: ~9000 active partitions at 100 tenants x 90 days. Logs typically 10x trace volume — pressure on this table is higher than traces_v1. Revisit toYYYYMM if part counts grow problematic. See spec §10.
 PARTITION BY (tenant_id, toYYYYMMDD(ts))
 ORDER BY (tenant_id, service, ts)
 SETTINGS index_granularity = 8192;
 
 CREATE ROW POLICY IF NOT EXISTS tenant_isolation_logs_v1 ON logs_v1
-    USING tenant_id = getSetting('custom_tenant_id') TO openaiops;
+    USING tenant_id = getSetting('custom_tenant_id')
+    TO openaiops;
