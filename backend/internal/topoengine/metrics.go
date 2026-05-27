@@ -7,7 +7,6 @@ import "github.com/prometheus/client_golang/prometheus"
 // in tests.
 type Metrics struct {
 	TickTotal         *prometheus.CounterVec
-	TickFailedTotal   prometheus.Counter
 	TenantFailedTotal *prometheus.CounterVec
 	TenantsProcessed  prometheus.Counter
 	EdgesWritten      *prometheus.CounterVec
@@ -22,10 +21,6 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Name: "topo_engine_tick_total",
 			Help: "Tick attempts by outcome (success|partial|failure)",
 		}, []string{"outcome"}),
-		TickFailedTotal: prometheus.NewCounter(prometheus.CounterOpts{
-			Name: "topo_engine_tick_failed_total",
-			Help: "Tick attempts that failed wholesale (no tenants succeeded)",
-		}),
 		TenantFailedTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "topo_engine_tenant_failed_total",
 			Help: "Per-tenant aggregation failures in a tick",
@@ -54,7 +49,6 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	}
 	reg.MustRegister(
 		m.TickTotal,
-		m.TickFailedTotal,
 		m.TenantFailedTotal,
 		m.TenantsProcessed,
 		m.EdgesWritten,

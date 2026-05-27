@@ -46,6 +46,7 @@ func FromEnv() (Config, error) {
 		TopoEngineAdminAddr:     defaultAddr("TOPO_ENGINE_ADMIN_ADDR", ":8084"),
 	}
 
+	// TOPO_* defaults below must stay in sync with topoengine.DefaultConfig().
 	if v := os.Getenv("TOPO_TICK_INTERVAL"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {

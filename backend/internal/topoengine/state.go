@@ -2,6 +2,9 @@ package topoengine
 
 import (
 	"context"
+	"errors"
+	"io"
+	"log/slog"
 	"time"
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
@@ -20,6 +23,14 @@ func (e *Engine) lastCompletedBucket(ctx context.Context) time.Time {
 	row := e.deps.Admin.AdminQueryRow(ctx, chquery.AdminMaxBucket, tid.String())
 	var t time.Time
 	if err := row.Scan(&t); err != nil {
+		// io.EOF / empty result = "no buckets yet, first boot" (legitimate zero).
+		// Other errors (driver / network) ALSO collapse to zero here for best-effort
+		// catchup behavior; the caller treats zero as "replay from now - CatchupMax".
+		// Real CH outages will surface via topo_engine_tick_failed_total at the tick layer.
+		if !errors.Is(err, io.EOF) {
+			slog.Warn("topoengine: lastCompletedBucket scan error (treating as zero)",
+				"err", err)
+		}
 		return time.Time{}
 	}
 	return t

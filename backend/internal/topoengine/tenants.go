@@ -3,6 +3,7 @@ package topoengine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,7 +32,9 @@ func (e *Engine) activeTenants(ctx context.Context, since time.Time) ([]uuid.UUI
 		}
 		tid, err := uuid.Parse(s)
 		if err != nil {
-			continue // skip non-UUID values defensively
+			slog.Warn("topoengine: skipping non-UUID tenant_id in traces_v1",
+				"tenant_id", s, "err", err)
+			continue
 		}
 		out = append(out, tid)
 	}

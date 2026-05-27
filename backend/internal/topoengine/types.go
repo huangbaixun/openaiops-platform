@@ -25,6 +25,10 @@ type Config struct {
 	TenantConcurrency int           // default 4 — per-bucket errgroup parallelism
 }
 
+// DefaultConfig returns the same defaults that config.FromEnv() applies when
+// TOPO_* env vars are unset. Used in tests that bypass env loading.
+// IF YOU CHANGE A DEFAULT HERE, also change it in internal/config/config.go's
+// FromEnv() TOPO_* block, and vice versa.
 func DefaultConfig() Config {
 	return Config{
 		TickInterval:      time.Minute,
