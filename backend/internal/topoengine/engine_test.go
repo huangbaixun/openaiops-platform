@@ -103,3 +103,29 @@ func TestTopoEngine_RunOnce_WritesServiceStats(t *testing.T) {
 	require.Equal(t, uint64(1), got[key{"checkout", "Client"}].Calls)
 	require.Equal(t, uint64(1), got[key{"checkout", "Client"}].Errors)
 }
+
+// TestTopoEngine_Idempotency_DoubleRun asserts ReplacingMergeTree FINAL
+// dedupes a same-bucket re-run: edges queried after RunOnce twice equals
+// edges queried after RunOnce once. Re-running the same bucket is a no-op
+// from the consumer's perspective — this is the contract Catchup relies on.
+func TestTopoEngine_Idempotency_DoubleRun(t *testing.T) {
+	eng, conn := setupEngine(t, topoengine.DefaultConfig())
+	defer conn.Close()
+
+	tidStr := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+	tid := uuid.MustParse(tidStr)
+	tctx := auth.WithTenant(context.Background(), tid, "test-e")
+	bucket := time.Now().UTC().Truncate(time.Minute).Add(-2 * time.Minute)
+
+	seedSpansForTenant(t, conn, tidStr, bucket, []SpanSpec{
+		{Service: "frontend", SpanID: "s1", Kind: "Server", Status: "Ok", DurationNs: 1000},
+		{Service: "checkout", SpanID: "s2", ParentSpanID: "s1", Kind: "Server", Status: "Ok", DurationNs: 2000},
+	})
+
+	require.NoError(t, eng.RunOnce(tctx, bucket))
+	first := queryEdges(t, conn, tctx, bucket)
+	require.NoError(t, eng.RunOnce(tctx, bucket))
+	second := queryEdges(t, conn, tctx, bucket)
+	require.ElementsMatch(t, first, second,
+		"ReplacingMergeTree FINAL should dedupe re-runs of the same bucket")
+}
