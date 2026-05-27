@@ -1,4 +1,4 @@
-.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up seed-traces demo-traces seed-logs demo-logs
+.PHONY: up down build seed smoke fmt fmt-go fmt-fe lint lint-go lint-fe lint-ch test test-go test-go-integration test-fe e2e migrate-up migrate-down migrate-ch-up seed-traces demo-traces seed-logs demo-logs seed-topology demo-topology
 
 up:
 	docker-compose -f deploy/docker-compose.yml up -d
@@ -84,3 +84,16 @@ seed-logs:
 
 demo-logs: seed-traces seed-logs
 	@echo "demo data seeded — open https://localhost/logs and https://localhost/traces"
+
+# Seed a hot-r.o.d.-style 4-service topology (frontend→checkout→payment + checkout→redis)
+# into the running ingester. Honors INGESTER_OTLP_GRPC_HOST_PORT for local override.
+# topo-engine derives topology_edges_v1 + service_stats_v1 rows on its next 1-min tick.
+seed-topology:
+	cd backend && API_KEY=$${API_KEY:-test-key-acme} \
+		INGESTER_OTLP_GRPC_HOST_PORT=$${INGESTER_OTLP_GRPC_HOST_PORT:-4317} \
+		go run ./cmd/seed-topology
+
+demo-topology: seed-topology
+	@echo "Waiting ~120s for topo-engine to process the closed minute bucket..."
+	@sleep 120
+	@echo "demo topology seeded — open https://localhost/overview, /topology, /services/checkout"

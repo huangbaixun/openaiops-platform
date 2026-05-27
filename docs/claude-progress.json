@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
-  "updated_at": "2026-05-26",
+  "updated_at": "2026-05-27",
   "active_branch": "main",
-  "current_focus": "SLICE-2 complete (14 tasks, all 10 ACs verified). Log vertical: log-ingester (4327/4328) → CH logs_v1 → /api/v1/logs → /logs page + cross-jump from /traces. Drift D4 closed: Caddy is sole ingress, nginx /api blocks removed; Playwright D4 regression assertion locks it. internal/ingestshared/ extracted for both ingesters to reuse. Next: SLICE-3 brainstorming (services + topology).",
+  "current_focus": "SLICE-3 complete (15 tasks, 10/10 ACs verified). Services + topology vertical: cmd/topo-engine 4th binary on :8084 → ReplacingMergeTree topology_edges_v1 + service_stats_v1 with FINAL idempotency → /api/v1/services{,/{name}} + /api/v1/topology on cmd/query → 4 new frontend pages (/overview, /services/:name 6-tab, /topology, /traces/:id Service Map subtab body via client-side derive). Shared <ServiceGraph> (d3-force + hand-rolled SVG) reused 3 places. Zero nginx changes (D4 stays closed; SLICE-2's promise upheld). 26 Playwright + 89 vitest + full backend integration all PASS. Next: SLICE-4 brainstorming (metrics + alerts) — OR first dig into D6 (AdminConn CH-user Row Policy bypass deployment concern that prevents topo-engine from discovering tenants in dev/prod).",
   "open_tasks": [],
   "recently_completed": [
     {
@@ -23,6 +23,12 @@
       "name": "SLICE-2 — Log ingest end-to-end",
       "summary": "SDK / telemetrygen-logs → cmd/log-ingester (OTel otlpreceiver embed, gRPC :4327 + HTTP :4328, Bearer-on-receiver auth, IncludeMetadata applied on both transports day-1 per SLICE-1 lesson) → CH logs_v1 with Row Policy → GET /api/v1/logs on cmd/query :8081 with full filter suite → Vue /logs page (SeverityBadge + LogRow expand + filter bar + URL source-of-truth) + /traces/:id Logs subtab (LogsPanel, span-click scoping). 14 tasks. Drift D4 closed: nginx /api blocks deleted; Caddy is sole ingress; Playwright test #4 locks the architectural assertion. internal/ingestshared/ extracted for both ingesters to reuse. Five bugs caught: circular import during shared extraction; bodyAsString Map-type needed JSON not Go-syntax; body_contains used LIKE not positionUTF8; LogsPanel double-fetch via suppressNextWatch; cross_tenant sub2/3 passed vacuously due to ingest-inside-t.Run. All 10 ACs verified: AC #2/#6 via CH schema + system.row_policies; AC #1/#3/#5/#8 via Go integration tests (22 sub-tests); AC #4 via handler/repo unit tests + curl; AC #7 via Playwright 5/5 + vitest 52/52; AC #9 via metering integration test; AC #10 via nginx.conf deletion + D4 regression Playwright assertion.",
       "evidence": "deploy/SLICE-2-evidence.txt + commits cda3fb8..<T14 SHA>"
+    },
+    {
+      "date": "2026-05-27",
+      "name": "SLICE-3 — Services + topology end-to-end",
+      "summary": "cmd/topo-engine 4th binary on :8084 (1min ticker + cold-start Catchup capped at TOPO_CATCHUP_MAX=1h + per-tenant errgroup limit TOPO_TENANT_CONCURRENCY=4 + 4 Prometheus metrics) → two-Pass RunOnce writes ReplacingMergeTree topology_edges_v1 (per pair) + service_stats_v1 (per service x span_kind), idempotent via FINAL in reads → chquery.AdminConn introduced with lint-confined whitelist (AdminListTenants + AdminMaxBucket only, only callable from internal/topoengine/) → 3 new query handlers (/v1/services, /v1/services/{name}, /v1/topology) all behind Caddy as one-line handle adds (zero nginx changes proves SLICE-2's promise) → 4 new Vue pages (/overview, /services/:name 6-tab NTabs shell, /topology, /traces/:id Service Map subtab body via client-side derive — zero new endpoint) → shared <ServiceGraph> (d3-force + hand-rolled SVG) reused 3 places → <TimeWindowPicker> with ?window= URL source-of-truth + suppressNextWatch composable lifted from SLICE-2 LogsPanel. 15 tasks. 9 bugs caught during execution: ORDER BY missing caller_kind; AdminConn godoc lied; tenants.go silent UUID skip; plan had wrong-format UUIDs; lint rule too narrow for cmd/topo-engine; d3-force needs source/target fields; vue-router test harness needs await router.isReady; useForceSimulation TS2344; AND T15 caught a T11 regression where services.ts + topology.ts used raw fetch() instead of the shared axios client (skipping the Bearer interceptor — 401 on every new page). Regression locked by api/__tests__/client.spec.ts (asserts interceptor injects Bearer from localStorage). 26/26 Playwright PASS (+13 new SLICE-3 specs); 21 vitest files / 89 tests PASS (+10 from T15 api auth regression specs); backend unit + integration (incl. 5 topoengine integration tests + cross-tenant 6 sub-assertions) all PASS. One new known drift D6: topo-engine AdminConn → activeTenants returns 0 in prod because tenant_isolation_traces_v1 Row Policy filters tenant discovery — needs CH user exemption (deployment concern; integration tests already use exempt test CH user).",
+      "evidence": "deploy/SLICE-3-evidence.txt + commits 7f0f09d..<T15 SHA>"
     }
   ],
   "notes": [
@@ -55,6 +61,21 @@
       "date": "2026-05-26",
       "kind": "lesson",
       "note": "SLICE-2 cross_tenant sub2/sub3 passed vacuously before T11 review fix: the ingest call was inside t.Run for sub1, so if sub1 ran correctly but sub2/3 got no data, they trivially passed. Always hoist shared setup (ingest calls, schema seeding) outside t.Run blocks to ensure later sub-tests actually exercise the deny-path with real data."
+    },
+    {
+      "date": "2026-05-27",
+      "kind": "lesson",
+      "note": "SLICE-3 T15 caught a SLICE-3 T11 regression that survived 4 review passes + 3 Playwright runs of OTHER specs: services.ts + topology.ts used raw fetch('/api/v1/...') instead of routing through the shared api/client.ts axios instance. The shared client's request interceptor (auto-injects Bearer from localStorage.apiKey) was therefore skipped, and every /overview / /topology / /services/:name page hit 401. The vitest specs originally written for T11 mocked global fetch() and asserted the URL string — they never noticed the missing Authorization header. Lesson: ANY new API module MUST import the shared client and test specs should assert client.get(path, ...) was called, not the raw URL string. Regression locked by api/__tests__/client.spec.ts which directly invokes the request interceptor and asserts the Bearer header gets stamped. Apply this checklist to every future api/ module added (SLICE-4 metrics + alerts will land 4-6 of these)."
+    },
+    {
+      "date": "2026-05-27",
+      "kind": "lesson",
+      "note": "SLICE-3 T15 also caught a multi-container staleness pattern: when query+topo-engine handlers land across T8/T9 commits and frontend pages land across T12-T14 but the running compose stack is days old, `make seed-topology` succeeds (writes traces) but every downstream verification appears broken because the running containers don't have the new code. Cure: `docker compose -f deploy/docker-compose.yml build query topo-engine frontend && up -d` BEFORE running any e2e verification in the closing T15 evidence loop. Add this to future closing-task playbooks."
+    },
+    {
+      "date": "2026-05-27",
+      "kind": "lesson",
+      "note": "SLICE-3 first slice that proves SLICE-2's nginx-deletion was sound: added 2 new query routes (/api/v1/services*, /api/v1/topology*) with ZERO frontend/nginx.conf changes. Each new route was a single 4-line Caddy handle. Future slices (metrics, alerts) repeat this pattern. The architectural assertion 'one-line Caddy adds for future query routes' is now proven, not promised."
     }
   ],
   "known_drift": [

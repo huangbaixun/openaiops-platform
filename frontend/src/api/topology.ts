@@ -1,3 +1,4 @@
+import client from './client'
 import type { TimeWindow } from '../composables/useTimeWindow'
 
 export interface TopologyNode {
@@ -23,14 +24,13 @@ export interface TopologyResponse {
   edges: TopologyEdge[]
 }
 
+// Same auth-via-shared-client fix as services.ts — SLICE-3 T15 regression.
 export async function fetchTopology(
   window: TimeWindow,
   nodeLimit = 100,
 ): Promise<TopologyResponse> {
-  const r = await fetch(
-    `/api/v1/topology?window=${window}&node_limit=${nodeLimit}`,
-    { credentials: 'include' },
-  )
-  if (!r.ok) throw new Error(`topology ${r.status}`)
-  return r.json()
+  const { data } = await client.get<TopologyResponse>('/v1/topology', {
+    params: { window, node_limit: nodeLimit },
+  })
+  return data
 }

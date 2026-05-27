@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test'
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3000'
+// Use relative paths so playwright.config.ts baseURL (=https://localhost) wins.
+// Hardcoded http://localhost:3000 was SLICE-2 drift D5 — local OrbStack/SignOz
+// intercepted port 3000. Lock-in: closed in SLICE-3 T15.
 
 // NaiveUI NInput puts data-testid on a wrapper div; the actual <input> is inside it.
 // We use the wrapper to scope, then find the inner input element.
 test('login with valid key shows home + tenant name', async ({ page }) => {
-  await page.goto(`${BASE}/login`)
+  await page.goto('/login')
   await page.getByTestId('apiKey-input').locator('input').fill('test-key-acme')
   await page.getByTestId('submit-btn').click()
   await expect(page).toHaveURL(/\/$/)
@@ -13,14 +15,14 @@ test('login with valid key shows home + tenant name', async ({ page }) => {
 })
 
 test('login with wrong key shows error', async ({ page }) => {
-  await page.goto(`${BASE}/login`)
+  await page.goto('/login')
   await page.getByTestId('apiKey-input').locator('input').fill('not-a-real-key')
   await page.getByTestId('submit-btn').click()
   await expect(page).toHaveURL(/\/login/)
 })
 
 test('language switch toggles UI', async ({ page }) => {
-  await page.goto(`${BASE}/login`)
+  await page.goto('/login')
   // The lang-select is inside the login card; clicking opens the dropdown.
   await page.getByTestId('lang-select').click()
   // NaiveUI dropdown options use class n-base-select-option__content.
@@ -33,16 +35,16 @@ test('language switch toggles UI', async ({ page }) => {
 })
 
 test('two tenants do not see each others data via key', async ({ browser }) => {
-  const ctxA = await browser.newContext()
+  const ctxA = await browser.newContext({ ignoreHTTPSErrors: true })
   const pageA = await ctxA.newPage()
-  await pageA.goto(`${BASE}/login`)
+  await pageA.goto('/login')
   await pageA.getByTestId('apiKey-input').locator('input').fill('test-key-acme')
   await pageA.getByTestId('submit-btn').click()
   await expect(pageA.getByTestId('tenant-name')).toContainText('acme')
 
-  const ctxB = await browser.newContext()
+  const ctxB = await browser.newContext({ ignoreHTTPSErrors: true })
   const pageB = await ctxB.newPage()
-  await pageB.goto(`${BASE}/login`)
+  await pageB.goto('/login')
   await pageB.getByTestId('apiKey-input').locator('input').fill('test-key-beta')
   await pageB.getByTestId('submit-btn').click()
   await expect(pageB.getByTestId('tenant-name')).toContainText('beta')

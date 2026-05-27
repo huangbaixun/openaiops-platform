@@ -41,7 +41,7 @@ test('JSON tab shows raw payload', async ({ page }) => {
   await expect(page.getByTestId('trace-json')).toBeVisible()
 })
 
-test('Service Map tab shows coming-soon placeholder', async ({ page }) => {
+test('Service Map tab shows ServiceGraph (replaced SLICE-2 placeholder in SLICE-3 T14)', async ({ page }) => {
   await loginAs(page, 'test-key-acme')
   await page.getByTestId('nav-traces').click()
   const firstRow = page.locator('[data-testid=traces-table] tbody tr').first()
@@ -49,7 +49,13 @@ test('Service Map tab shows coming-soon placeholder', async ({ page }) => {
   await firstRow.click()
 
   await page.locator('.n-tabs-tab', { hasText: /(Service Map|服务地图)/ }).click()
-  await expect(page.getByTestId('service-map-placeholder')).toBeVisible()
+  // SLICE-3 T14 replaced the static placeholder with the real ServiceMapPanel
+  // which derives nodes+edges client-side from already-loaded spans (zero
+  // backend call). Either the SVG renders OR <NEmpty graph-empty> shows if
+  // the trace has no parent_span_id chains — both prove the panel mounted.
+  await expect(
+    page.locator('[data-testid="service-graph"], [data-testid="graph-empty"]')
+  ).toBeVisible({ timeout: 5_000 })
 })
 
 test('beta: empty list (cross-tenant UX, no leakage)', async ({ browser }) => {

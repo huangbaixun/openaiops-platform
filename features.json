@@ -56,6 +56,10 @@
     {
       "date": "2026-05-27",
       "event": "SLICE-3 plan landed (docs/plans/2026-05-27-slice-3-plan.md) — 15 tasks with 100% AC coverage gate. Subagent-driven execution mode chosen. Status proposed → building."
+    },
+    {
+      "date": "2026-05-27",
+      "event": "SLICE-3 done — 15 tasks, all 10 ACs verified. Services + topology vertical: cmd/topo-engine (4th binary on :8084) → 1min tick processes closed bucket → CH topology_edges_v1 + service_stats_v1 ReplacingMergeTree tables with FINAL idempotency → /api/v1/services{,/{name}} + /api/v1/topology on cmd/query → 4 new frontend pages (/overview, /services/:name 6-tab, /topology, /traces/:id Service Map subtab body via client-side derive). Shared <ServiceGraph> (d3-force + hand-rolled SVG) reused 3 places. Zero nginx changes (drift D4 stays closed). 9 bugs caught during execution incl. SLICE-3 T15 caught a SLICE-3 T11 regression (services.ts + topology.ts used raw fetch() and skipped the shared axios Bearer interceptor → 401 on every new page; locked by api/__tests__/client.spec.ts). One new known drift D6 (topo-engine AdminConn → activeTenants returns 0 in prod because Row Policy filters tenant discovery; needs CH user exemption — deployment concern, not code correctness). 26/26 Playwright PASS (incl. 13 new SLICE-3 specs); 21 vitest files / 89 tests PASS (+10 from T15 api/auth regression tests). See deploy/SLICE-3-evidence.txt."
     }
   ],
   "legend": {
@@ -229,8 +233,26 @@
       "id": "SLICE-3",
       "title": "Services + Topology — cmd/topo-engine + 2 CH aggregation tables + 3 new Query API endpoints + 4 new frontend pages",
       "priority": "P0",
-      "status": "building",
-      "current_state": "SLICE-2 done; trace + log verticals work. No service-to-service edge derivation; no per-service RED aggregation; topology_edges_v1 and service_stats_v1 tables don't exist; no /api/v1/services or /api/v1/topology routes; no /overview, /services/:name, or /topology frontend pages; /traces/:id Service Map subtab is a 'Coming in SLICE-3' NEmpty placeholder; SideBar overview/services/topology entries are to:null. cmd/topo-engine binary does not exist; chquery.AdminConn does not exist.",
+      "status": "done",
+      "completed_at": "2026-05-27",
+      "evidence": {
+        "commits_range": "7f0f09d..<T15 SHA>",
+        "task_count": 15,
+        "ac_summary": "10/10 ACs verified. AC #2/#3 via CH SHOW CREATE TABLE + system.row_policies (both tenant_isolation_topology_edges_v1 + tenant_isolation_service_stats_v1 attached). AC #1/#4 via Go integration tests (TestTopoEngine_RunOnce_WritesEdgesAndStats, Idempotency_DoubleRun, Catchup_FromLastCompleted, CannotWriteEdgeAcrossTenant — all PASS via dockertest). AC #5/#6/#7 via services_repo_test + topology_repo_test + handler unit tests + live curl through Caddy. AC #8 via Caddy handle blocks present + zero nginx changes (D4 stays closed) + live verification curl through https://localhost. AC #9 via vitest 89/89 (incl. ServiceGraph + TimeWindowPicker suppressNextWatch + Overview + ServiceDetail + Topology + ServiceMapPanel + 3 new api regression specs) + Playwright topology/overview/service-detail specs (13 specs). AC #10 via TestSlice3_CrossTenantTopology 6 sub-assertions + write isolation + idempotency + Playwright cross-tenant assertions for all 4 new pages.",
+        "evidence_file": "deploy/SLICE-3-evidence.txt",
+        "bugs_caught_during_execution": [
+          "T1 review: topology_edges_v1 ORDER BY missing caller_kind → would silently dedupe future caller_kind values. Spec was wrong; corrected in commit a224ddb.",
+          "T2 review: AdminConn godoc lied (claimed no setting injection but adminCtx injected empty sentinel). Fixed in commit eda45e5.",
+          "T3 review: tenants.go silent skip on bad UUID + redundant TickFailedTotal counter + state.go io.EOF swallowed indistinguishably. Fixed in commit 30b2ce6.",
+          "T4: plan UUIDs were invalid 4-4-4-4-12 format (should be 8-4-4-4-12). Implementer caught + fixed.",
+          "T9: Pre-existing make lint-ch failure on cmd/topo-engine/main.go (rule too narrow). Fixed by extending lint Rule 2 to allow cmd/topo-engine/ subsystem. Commit d005814.",
+          "T10: forceLink in d3-force needs source/target fields; GraphEdge clone projection added in useForceSimulation.",
+          "T11: vue-router test harness needs await router.isReady() before mount; @/ alias not configured so tests use relative imports.",
+          "T13: useForceSimulation TS2344 from T10 baseline; GraphNode/SimEdge now extend SimulationNodeDatum/SimulationLinkDatum via SimEdge intermediate type. Commit abff6f4.",
+          "T15 (this commit): services.ts + topology.ts originally landed in T11 using raw fetch() instead of the shared api/client.ts axios instance. The shared client's request interceptor (auto-injects Bearer from localStorage.apiKey) was therefore skipped — every /overview / /topology / /services/:name page hit 401. Caught only when SLICE-3 T15 Playwright run rendered 'services 401' NAlert. Fixed by switching both API modules to client.get(); regression locked by new api/__tests__/client.spec.ts (interceptor injects header from localStorage) + updated services.spec.ts + topology.spec.ts (assert client.get('/v1/...'), not fetch('/api/v1/...'))."
+        ]
+      },
+      "current_state": "SLICE-3 DONE 2026-05-27. cmd/topo-engine 4th binary running on :8084; topology_edges_v1 + service_stats_v1 ReplacingMergeTree tables with FINAL queries; 3 new query API endpoints; 4 new frontend pages with shared <ServiceGraph>. 26 Playwright specs PASS; 89 vitest tests PASS; backend integration suite PASS. Known drift D6: AdminConn → activeTenants returns 0 in prod due to Row Policy filter on traces_v1 — needs CH user exemption (deployment concern, not code correctness; integration tests already use exempt CH user).",
       "target_state": "cmd/topo-engine runs as 4th docker-compose service on :8084 admin; every 1min processes the latest closed bucket [T-2min, T-1min); reads traces_v1 via SELF JOIN; writes topology_edges_v1 (per pair) + service_stats_v1 (per service x span_kind). Cold-start Catchup replays missing buckets up to TOPO_CATCHUP_MAX=1h gap. cmd/query :8081 gains /api/v1/services (list+RED), /api/v1/services/{name} (stats+inbound+outbound deps), /api/v1/topology (nodes+edges for force-directed graph). Caddy adds 2 handle blocks (zero nginx change). Frontend ships /overview (service cards, RED color rings), /services/:name (NTabs: Signals + Dependencies + 4 ComingSoonTab placeholders), /topology (global force-directed graph via d3-force + hand-rolled SVG, ≤100 nodes), /traces/:id Service Map subtab body (client-side derived from in-memory spans). Shared <ServiceGraph> component reused 3 places. ?window= URL param drives 15m/1h/6h/24h fixed buckets across all 3 new pages. SideBar overview/services/topology entries enabled. Cross-tenant integration test (6 sub-assertions) asserts tenant B cannot see tenant A's services or topology.",
       "acceptance_criteria": [
         "cmd/topo-engine on :8084 admin port; every 1min processes closed bucket [T-2min, T-1min); cold-start Catchup replays missing buckets capped at TOPO_CATCHUP_MAX (default 1h); per-tenant errgroup limit TOPO_TENANT_CONCURRENCY (default 4); single-tenant failure does not abort tick; topo_engine_bucket_lag_seconds gauge + topo_engine_tick_failed_total + topo_engine_tenant_failed_total{tenant_id} counters exposed at :8084/metrics; /healthz returns 200 once Catchup completes + at least one tick has run",
