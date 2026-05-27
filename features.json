@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "description": "openaiops-platform feature ledger. Cross-session contract; status transitions are real product gates.",
-  "updated_at": "2026-05-26",
+  "updated_at": "2026-05-27",
   "owner": "@huangbaixun",
   "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
   "history": [
@@ -48,6 +48,10 @@
     {
       "date": "2026-05-26",
       "event": "SLICE-2 done — 14 tasks, all 10 ACs verified. Log vertical: cmd/log-ingester → CH logs_v1 (Row Policy) → /api/v1/logs → /logs page + /traces/:id Logs subtab. Drift D4 closed: nginx /api blocks deleted, Caddy sole ingress. Playwright D4 regression locks the architectural guard. 5 bugs caught during execution. See deploy/SLICE-2-evidence.txt."
+    },
+    {
+      "date": "2026-05-27",
+      "event": "SLICE-3 spec landed (docs/specs/2026-05-27-slice-3-services-topology-design.md) — brainstormed 7 design choices: 1min topo-engine background job → 2 tables (topology_edges_v1 + service_stats_v1) with ReplacingMergeTree+FINAL idempotency; full UI scope (Overview cards + Service detail + /topology + /traces/:id Service Map body) MINUS ⌘K which de-scoped to SLICE-3.5; d3-force + hand-rolled SVG (consistent with SLICE-1 waterfall); external nodes via peer.service/db.system/messaging.system/http.host COALESCE; fixed-bucket time window 15m/1h/6h/24h; per-trace Service Map = client-side derive (zero new endpoint). 4th binary cmd/topo-engine on :8084; 2 new Caddy handles; zero nginx change (D4 still closed). 10 ACs. Next: writing-plans for docs/plans/2026-05-27-slice-3-plan.md."
     }
   ],
   "legend": {
@@ -216,6 +220,50 @@
       "estimated_effort_days": "12",
       "owner": "@huangbaixun",
       "notes": "Second vertical slice. Same Bearer-on-receiver pattern as SLICE-1; binary split (new cmd/log-ingester) decided this session — symmetric to PRE-2 cmd/query split for independent blast radius. Internal package refactor: extract internal/ingestshared/ (admin, auth, host, metering, metrics) so internal/ingest/ stays trace-only and new internal/logingest/ stays log-only. Drift D4 bundled: nginx /api blocks deleted, Caddy becomes sole ingress (closes 2026-05-26 lessons-learned D4). Packaging B chosen — adds span-granularity scoping (?span_id=X) and JSON body pretty-print on top of the minimal mirror-SLICE-1 baseline."
+    },
+    {
+      "id": "SLICE-3",
+      "title": "Services + Topology — cmd/topo-engine + 2 CH aggregation tables + 3 new Query API endpoints + 4 new frontend pages",
+      "priority": "P0",
+      "status": "proposed",
+      "current_state": "SLICE-2 done; trace + log verticals work. No service-to-service edge derivation; no per-service RED aggregation; topology_edges_v1 and service_stats_v1 tables don't exist; no /api/v1/services or /api/v1/topology routes; no /overview, /services/:name, or /topology frontend pages; /traces/:id Service Map subtab is a 'Coming in SLICE-3' NEmpty placeholder; SideBar overview/services/topology entries are to:null. cmd/topo-engine binary does not exist; chquery.AdminConn does not exist.",
+      "target_state": "cmd/topo-engine runs as 4th docker-compose service on :8084 admin; every 1min processes the latest closed bucket [T-2min, T-1min); reads traces_v1 via SELF JOIN; writes topology_edges_v1 (per pair) + service_stats_v1 (per service x span_kind). Cold-start Catchup replays missing buckets up to TOPO_CATCHUP_MAX=1h gap. cmd/query :8081 gains /api/v1/services (list+RED), /api/v1/services/{name} (stats+inbound+outbound deps), /api/v1/topology (nodes+edges for force-directed graph). Caddy adds 2 handle blocks (zero nginx change). Frontend ships /overview (service cards, RED color rings), /services/:name (NTabs: Signals + Dependencies + 4 ComingSoonTab placeholders), /topology (global force-directed graph via d3-force + hand-rolled SVG, ≤100 nodes), /traces/:id Service Map subtab body (client-side derived from in-memory spans). Shared <ServiceGraph> component reused 3 places. ?window= URL param drives 15m/1h/6h/24h fixed buckets across all 3 new pages. SideBar overview/services/topology entries enabled. Cross-tenant integration test (6 sub-assertions) asserts tenant B cannot see tenant A's services or topology.",
+      "acceptance_criteria": [
+        "cmd/topo-engine on :8084 admin port; every 1min processes closed bucket [T-2min, T-1min); cold-start Catchup replays missing buckets capped at TOPO_CATCHUP_MAX (default 1h); per-tenant errgroup limit TOPO_TENANT_CONCURRENCY (default 4); single-tenant failure does not abort tick; topo_engine_bucket_lag_seconds gauge + topo_engine_tick_failed_total + topo_engine_tenant_failed_total{tenant_id} counters exposed at :8084/metrics; /healthz returns 200 once Catchup completes + at least one tick has run",
+        "CH topology_edges_v1 table (tenant_id LowCardinality first; ts_bucket DateTime with Delta+ZSTD; caller_service/caller_kind/callee_service/callee_kind LowCardinality(String); calls/errors/p95_duration UInt64 T64+LZ4; ENGINE=ReplacingMergeTree; ORDER BY (tenant_id, ts_bucket, caller_service, callee_service, callee_kind); PARTITION BY (tenant_id, toYYYYMMDD(ts_bucket))); Row Policy tenant_isolation_topology_edges_v1 attached with USING tenant_id = getSetting('custom_tenant_id') TO openaiops",
+        "CH service_stats_v1 table (tenant_id LowCardinality first; ts_bucket DateTime with Delta+ZSTD; service/span_kind LowCardinality(String); calls/errors/p95_duration UInt64; ENGINE=ReplacingMergeTree; ORDER BY (tenant_id, ts_bucket, service, span_kind)); Row Policy tenant_isolation_service_stats_v1 attached",
+        "internal/topoengine.Engine.RunOnce(ctx, bucket) runs two Passes per tenant: Pass A writes topology_edges_v1 (LEFT JOIN traces_v1 self with SETTINGS join_use_nulls=1 so IS NULL checks fire; internal edge when a.service IS NOT NULL AND a.service != b.service [caller=a.service, callee=b.service, callee_kind=service]; external edge when b.span_kind='Client' AND b.parent_span_id != '' AND (a.service IS NULL OR a.service = b.service) AND has peer attribute [caller=b.service, callee derived from nullIf+coalesce over peer.service / db.system / messaging.system / http.host / 'unknown-external', callee_kind=external]; multiIf branches on the same internal-vs-external predicate for caller_service / callee_service / callee_kind to ensure consistency); Pass B writes service_stats_v1 (GROUP BY service, span_kind). Both Passes use chquery.Conn (Layer 1 SQL WHERE tenant_id + Layer 2 Row Policy + Layer 3 chquery custom_tenant_id setting). New chquery.AdminConn type bypasses MustTenantScope for whitelisted SQL (AdminListTenants, AdminMaxBucket); make lint-ch rule extended to forbid chquery.AdminConn construction outside internal/topoengine/",
+        "GET /api/v1/services on cmd/query :8081 with window enum 15m|1h|6h|24h (handler whitelist → INTERVAL N MINUTE/HOUR); returns items[].{service, inbound_calls, inbound_errors, inbound_error_rate, inbound_p95_ms, outbound_calls}; sumIf/maxIf over service_stats_v1 FINAL filtered by span_kind='Server' for inbound and 'Client' for outbound; HAVING inbound_calls>0 OR outbound_calls>0; ORDER BY inbound_calls DESC; LIMIT default 100 max 500",
+        "GET /api/v1/services/{name}?window=... returns stats.{inbound, outbound} + dependencies.{inbound[], outbound[]}; self stats from service_stats_v1 FINAL grouped by span_kind; inbound deps from topology_edges_v1 FINAL where callee_service=name AND callee_kind='service'; outbound deps from topology_edges_v1 FINAL where caller_service=name; each dependencies array LIMIT 50; 404 when service has neither stats nor edges in window",
+        "GET /api/v1/topology?window=...&node_limit=N returns nodes[].{service, kind, calls, errors, p95_ms} + edges[].{caller, callee, callee_kind, calls, errors, p95_ms}; top_services CTE filters by sum(calls) DESC LIMIT node_limit (default 100, max 300); external nodes (callee_kind='external') never truncated; empty window returns 200 + {nodes:[], edges:[]}",
+        "Caddy gets /api/v1/services* + /api/v1/topology* handle blocks (uri strip_prefix /api + reverse_proxy query:8081) listed before catch-all /api/* handle; zero changes to frontend/nginx.conf (drift D4 closed in SLICE-2 holds); CLAUDE.md port table updated to add 8084 topo-engine canonical port; deploy/.env.example adds TOPO_ENGINE_ADMIN_HOST_PORT=8084",
+        "Frontend ships 4 pages: /overview (ServiceCard grid with RED color ring, NTabs window picker), /services/:name (NTabs shell with SignalsTab + DependenciesTab + 4 ComingSoonTab placeholders for Runtime/Exceptions/Settings/Alerts), /topology (TopologyPage with shared <ServiceGraph>, ≤100 nodes), /traces/:id Service Map subtab body (ServiceMapPanel.vue client-side derives nodes+edges from already-loaded spans via Vue computed, zero backend call, zero external node inference). Shared <ServiceGraph> component reused in all 3 graph locations (uses d3-force ~30KB gz simulation + hand-rolled Vue SVG render). <TimeWindowPicker> URL ?window= as single source of truth + suppressNextWatch composable pattern (SLICE-2 LogsPanel T9/T10 lesson reused). SideBar overview/services/topology entries change from to:null to real paths (services entry shares /overview).",
+        "Cross-tenant integration test (backend/internal/topoengine/cross_tenant_test.go, build tag integration): 6 sub-assertions — A sees own topology with checkout/redis nodes, B sees own topology with mobile/orders, B GET /services/{A-service-name} returns 404, B GET /services list excludes all A services, missing Bearer on all 3 new routes returns 401, garbage Bearer on all 3 new routes returns 401. seedSpansForTenant and eng.RunOnce calls HOISTED outside t.Run blocks per SLICE-2 T11 lesson. Plus 4 additional integration tests: TestTopoEngine_RunOnce_WritesEdgesAndStats, TestTopoEngine_Idempotency_DoubleRun (ReplacingMergeTree FINAL dedupes), TestTopoEngine_Catchup_FromLastCompleted, TestTopoEngine_CannotWriteEdgeAcrossTenant (reverse write isolation). CI matrix: backend-unit (engine/handler/admin unit tests), backend-integration (5 new integration files), frontend-unit (8 new vitest spec files including TimeWindowPicker suppressNextWatch regression), e2e (make seed-topology + topology.spec.ts + overview.spec.ts + service-detail.spec.ts); lint-ch rule extended for chquery.AdminConn usage location"
+      ],
+      "out_of_scope": [
+        "⌘K command palette + services candidates injection (skeleton ADR-0001 §4.4 promised in Slice 0 was YAGNI'd; building skeleton in SLICE-3 adds ~3 tasks — recommend folding into SLICE-3.5 or SLICE-5)",
+        "Service detail tabs 3-6 (Runtime/Exceptions/Settings/Alerts) — depend on SLICE-4 metrics and SLICE-5 tenant settings; SLICE-3 ships ComingSoonTab placeholders",
+        "True windowed quantile (vs maxIf(p95) per-bucket-max approximation) — requires quantileTDigestState columns in topo-engine writes; folded into SLICE-4 metrics aggregation rework",
+        "Separate /services table view — SideBar services shares /overview cards; sortable table view deferred to SLICE-3.5",
+        "/api/v1/services/{name}/traces and /logs quick-link endpoints — not needed; SignalsTab links directly to /traces?service=X (filter already supported by SLICE-1/2)",
+        "topo-engine HA / leader election — single instance suffices; ReplacingMergeTree tolerates restart re-runs",
+        "OPTIMIZE TABLE ... FINAL scheduled job — does not run (too costly); FROM ... FINAL in queries guarantees correctness",
+        "Topology node hover tooltip with inbound/outbound split — v1 hover shows current node RED summary only; click navigates to /services/:name for breakdown",
+        "Topology time-animation / sliding-window replay — fixed-bucket TimeWindowPicker satisfies ADR-0001 'time window switch with number replay'; continuous animation deferred",
+        "External node reverse navigation (external node → trace_id) — external nodes don't map to specific traces; UX deferred",
+        "Per-trace Service Map external derivation — peer-attribute inference unstable within single trace; external nodes appear only in global /topology",
+        "Proactive 501 stubs for /api/v1/alerts — SLICE-4 adds its own one-line Caddy handle",
+        "AsyncInsert / column-mode batch on chquery.Batch — add when throughput data demands",
+        "OTel SDK attribute alias normalization (peer.service vs net.peer.name vs server.address) — known_drift for SLICE-3.5"
+      ],
+      "dependencies": [
+        "SLICE-1",
+        "SLICE-2"
+      ],
+      "spec": "docs/specs/2026-05-27-slice-3-services-topology-design.md",
+      "estimated_effort_days": "21",
+      "owner": "@huangbaixun",
+      "notes": "Third vertical slice. First slice with a non-OTLP-receiving backend service (cmd/topo-engine). Introduces chquery.AdminConn for the tenant-discovery case (whitelisted SQL only, lint-confined to internal/topoengine/). External node inference via COALESCE on peer attributes is the second-biggest design choice after the 1min job-vs-MV decision. Drift D4 stays closed: zero nginx changes (this is the first slice that proves SLICE-2's promise that future query routes are one-line Caddy adds). ⌘K explicitly de-scoped during brainstorming after discovering the cmd palette skeleton was never built — Q2 'full scope' answer carried the assumption it existed. SLICE-3 plan should target 14-16 tasks (similar to SLICE-1's 16); 21-day estimate (vs ADR-0001's 5-week estimate) reflects two-Pass topo-engine job + shared graph component complexity offset by SLICE-1/2 helpers (chtest, suppressNextWatch pattern, ingestshared) being reusable."
     }
   ]
 }
