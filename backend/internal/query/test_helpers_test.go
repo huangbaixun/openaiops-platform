@@ -31,6 +31,8 @@ func TestMain(m *testing.M) {
 	fixture := chtest.StartCH(fatalReporter{},
 		"20260525120000_create_traces_v1.sql",
 		"20260527120000_create_logs_v1.sql",
+		"20260527120000_create_topology_edges_v1.sql",
+		"20260527120100_create_service_stats_v1.sql",
 	)
 	dsn = fixture.DSN
 

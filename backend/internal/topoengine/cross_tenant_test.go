@@ -42,8 +42,13 @@ func TestSlice3_CrossTenantTopology(t *testing.T) {
 	db := pgEnsureSchema(t)
 	defer db.Close()
 
-	tidA := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	tidB := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	// Distinct UUIDs from TestTopoEngine_RunOnce_WritesEdges (uses aaaa..aaaa) to
+	// avoid cross-test pollution in the shared CH fixture: both tests seed similar
+	// service names (checkout, redis) into the same tenant bucket otherwise, and
+	// the engine_test's exact-count assertion (3 edges) breaks when this test runs
+	// first and leaves a second 'checkout->redis (service)' row behind.
+	tidA := uuid.MustParse("a9999999-9999-9999-9999-999999999991")
+	tidB := uuid.MustParse("b9999999-9999-9999-9999-999999999992")
 	keyA := seedAPIKey(t, db, tidA, "acme", "plain-key-a-cross-tenant")
 	keyB := seedAPIKey(t, db, tidB, "beta", "plain-key-b-cross-tenant")
 
