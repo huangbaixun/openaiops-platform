@@ -15,8 +15,8 @@
 - 反例 E2E（A 写 / B 读 → 0）是 SLICE-1 AC #8 落地，不是 PRE-3。
 
 ### 端口
-- canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 (ingester) / 4327 / 4328 / 8083 (log-ingester, SLICE-2 起) / 3000 (frontend)。Caddy :443 is the sole ingress for /api/* (drift D4 closed in SLICE-2)。
-- 本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `INGESTER_OTLP_GRPC_HOST_PORT` / `INGESTER_OTLP_HTTP_HOST_PORT` / `LOG_INGESTER_OTLP_GRPC_HOST_PORT` / `LOG_INGESTER_OTLP_HTTP_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
+- canonical 8080 (gateway) / 8081 (query, SLICE-1 起) / 4317 / 4318 / 8082 (ingester) / 4327 / 4328 / 8083 (log-ingester, SLICE-2 起) / 8084 (topo-engine, SLICE-3 起) / 3000 (frontend)。Caddy :443 is the sole ingress for /api/* (drift D4 closed in SLICE-2)。
+- 本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `INGESTER_OTLP_GRPC_HOST_PORT` / `INGESTER_OTLP_HTTP_HOST_PORT` / `LOG_INGESTER_OTLP_GRPC_HOST_PORT` / `LOG_INGESTER_OTLP_HTTP_HOST_PORT` / `TOPO_ENGINE_ADMIN_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
 
 ### 二进制 + 路由划分（ADR-0003）
 - gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/healthz`、`/livez`。依赖 PG。

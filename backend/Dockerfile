@@ -8,6 +8,7 @@ RUN CGO_ENABLED=0 go build -o /out/gateway       ./cmd/gateway
 RUN CGO_ENABLED=0 go build -o /out/query         ./cmd/query
 RUN CGO_ENABLED=0 go build -o /out/ingester      ./cmd/ingester
 RUN CGO_ENABLED=0 go build -o /out/log-ingester  ./cmd/log-ingester
+RUN CGO_ENABLED=0 go build -o /out/topo-engine   ./cmd/topo-engine
 RUN CGO_ENABLED=0 go build -o /out/seed-traces   ./cmd/seed-traces
 RUN CGO_ENABLED=0 go build -o /out/seed-logs     ./cmd/seed-logs
 
@@ -17,8 +18,9 @@ COPY --from=build /out/gateway       /usr/local/bin/gateway
 COPY --from=build /out/query         /usr/local/bin/query
 COPY --from=build /out/ingester      /usr/local/bin/ingester
 COPY --from=build /out/log-ingester  /usr/local/bin/log-ingester
+COPY --from=build /out/topo-engine   /usr/local/bin/topo-engine
 COPY --from=build /out/seed-traces   /usr/local/bin/seed-traces
 COPY --from=build /out/seed-logs     /usr/local/bin/seed-logs
-EXPOSE 8080 8081 4317 4318 8082 4327 4328 8083
+EXPOSE 8080 8081 4317 4318 8082 4327 4328 8083 8084
 # Default entrypoint kept as gateway for backward compat; compose services override.
 ENTRYPOINT ["/usr/local/bin/gateway"]

@@ -160,6 +160,33 @@ services:
       timeout: 3s
       retries: 10
 
+  # SLICE-3 background aggregator: every TOPO_TICK_INTERVAL it derives
+  # topology_edges_v1 + service_stats_v1 from the previous closed bucket
+  # of traces_v1. Admin port :8084 exposes /healthz, /livez, /metrics
+  # (topo_engine_* series). Mirrors the log-ingester service shape.
+  topo-engine:
+    build: ../backend
+    entrypoint: ["/usr/local/bin/topo-engine"]
+    environment:
+      DATABASE_URL: "postgres://openaiops:openaiops@postgres:5432/openaiops?sslmode=disable"
+      CLICKHOUSE_DSN: "clickhouse://openaiops:openaiops@clickhouse:9000/openaiops"
+      TOPO_ENGINE_ADMIN_ADDR: "0.0.0.0:8084"
+      TOPO_TICK_INTERVAL: "1m"
+      TOPO_CATCHUP_MAX: "1h"
+      TOPO_TENANT_CONCURRENCY: "4"
+    ports:
+      - "127.0.0.1:${TOPO_ENGINE_ADMIN_HOST_PORT:-8084}:8084"
+    depends_on:
+      postgres:   { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      ch-migrate: { condition: service_completed_successfully }
+      migrate:    { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8084/livez"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   frontend:
     build: ../frontend
     environment:

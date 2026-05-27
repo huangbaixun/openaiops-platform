@@ -18,6 +18,18 @@ localhost {
 		reverse_proxy query:8081
 	}
 
+	# SLICE-3 topology read paths (services + topology) also live on query.
+	# Must precede the /api/* catch-all (first-match-wins).
+	handle /api/v1/services* {
+		uri strip_prefix /api
+		reverse_proxy query:8081
+	}
+
+	handle /api/v1/topology* {
+		uri strip_prefix /api
+		reverse_proxy query:8081
+	}
+
 	# All other /api/* go to gateway.
 	handle /api/* {
 		uri strip_prefix /api
