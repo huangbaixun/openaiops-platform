@@ -93,6 +93,12 @@
       "item": "AdminConn cross-tenant visibility in production requires the CH user (used by topo-engine) to be exempted from tenant_isolation_* Row Policies. Currently undocumented in IaC; CLAUDE.md doesn't mention this prod requirement. SLICE-3 T8 deploy task should encode this (DDL adding the bypass policy or a comment on the CH user's GRANT block).",
       "severity": "medium",
       "tracked_in": "SLICE-3 T2 review (commit 442be9f) + admin.go AdminConn godoc"
+    },
+    {
+      "date": "2026-05-27",
+      "item": "frontend/src/components/ServiceGraph/useForceSimulation.ts: vue-tsc fails (TS2344) because GraphEdge.source/target are typed `string | GraphNode | undefined` but d3-force's SimulationLinkDatum requires the property to be non-undefined. Vitest passes (76/76) and vite dev/preview run fine; only `npm run build` (which prepends vue-tsc -b) fails. Pre-existed before T13 (introduced by T10 commit 662e3e1). Fix is to mark source/target as required (drop the `?`) in components/ServiceGraph/types.ts and either initialize them or let d3 do it at runtime; small follow-up.",
+      "severity": "low",
+      "tracked_in": "SLICE-3 T13 implementer note (this entry)"
     }
   ],
   "open_questions": [
