@@ -146,3 +146,31 @@ func queryEdges(t *testing.T, conn *chquery.Conn, ctx context.Context, bucket ti
 	}
 	return out
 }
+
+// statsRow is the projection of service_stats_v1 columns the Pass B tests
+// assert against.
+type statsRow struct {
+	Service, SpanKind  string
+	Calls, Errors, P95 uint64
+}
+
+// queryStats returns all service_stats_v1 rows for the tenant + bucket via FINAL.
+// MustTenantScope prepends tenant_id from ctx; only bucket is explicit.
+func queryStats(t *testing.T, conn *chquery.Conn, ctx context.Context, bucket time.Time) []statsRow {
+	t.Helper()
+	rows, err := conn.Query(ctx,
+		`SELECT service, span_kind, calls, errors, p95_duration
+         FROM service_stats_v1 FINAL
+         WHERE tenant_id = ? AND ts_bucket = ?
+         ORDER BY service, span_kind`,
+		bucket)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []statsRow
+	for rows.Next() {
+		var s statsRow
+		require.NoError(t, rows.Scan(&s.Service, &s.SpanKind, &s.Calls, &s.Errors, &s.P95))
+		out = append(out, s)
+	}
+	return out
+}

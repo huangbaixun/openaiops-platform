@@ -64,3 +64,42 @@ func TestTopoEngine_RunOnce_WritesEdges(t *testing.T) {
 		require.Equal(t, uint64(0), e.Errors)
 	}
 }
+
+// TestTopoEngine_RunOnce_WritesServiceStats asserts Pass B produces per-(service, kind)
+// rows from a seeded trace shape:
+//   - frontend / Server / calls=1 / errors=0
+//   - checkout / Server / calls=1 / errors=0
+//   - checkout / Client / calls=1 / errors=1 (Error status)
+func TestTopoEngine_RunOnce_WritesServiceStats(t *testing.T) {
+	eng, conn := setupEngine(t, topoengine.DefaultConfig())
+	defer conn.Close()
+
+	tidStr := "cccccccc-cccc-cccc-cccc-cccccccccccc"
+	tid := uuid.MustParse(tidStr)
+	tctx := auth.WithTenant(context.Background(), tid, "test-c")
+
+	bucket := time.Now().UTC().Truncate(time.Minute).Add(-2 * time.Minute)
+	seedSpansForTenant(t, conn, tidStr, bucket, []SpanSpec{
+		{Service: "frontend", SpanID: "s1", Kind: "Server", Status: "Ok", DurationNs: 1000},
+		{Service: "checkout", SpanID: "s2", ParentSpanID: "s1", Kind: "Server", Status: "Ok", DurationNs: 2000},
+		{Service: "checkout", SpanID: "s3", ParentSpanID: "s2", Kind: "Client", Status: "Error", DurationNs: 500,
+			Attrs: map[string]string{"db.system": "redis"}},
+	})
+
+	require.NoError(t, eng.RunOnce(tctx, bucket))
+
+	stats := queryStats(t, conn, tctx, bucket)
+	require.Len(t, stats, 3, "expected 3 stats rows, got %+v", stats)
+
+	type key struct{ svc, kind string }
+	got := map[key]statsRow{}
+	for _, r := range stats {
+		got[key{r.Service, r.SpanKind}] = r
+	}
+	require.Equal(t, uint64(1), got[key{"frontend", "Server"}].Calls)
+	require.Equal(t, uint64(0), got[key{"frontend", "Server"}].Errors)
+	require.Equal(t, uint64(1), got[key{"checkout", "Server"}].Calls)
+	require.Equal(t, uint64(0), got[key{"checkout", "Server"}].Errors)
+	require.Equal(t, uint64(1), got[key{"checkout", "Client"}].Calls)
+	require.Equal(t, uint64(1), got[key{"checkout", "Client"}].Errors)
+}
