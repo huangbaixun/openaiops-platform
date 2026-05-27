@@ -52,6 +52,10 @@
     {
       "date": "2026-05-27",
       "event": "SLICE-3 spec landed (docs/specs/2026-05-27-slice-3-services-topology-design.md) — brainstormed 7 design choices: 1min topo-engine background job → 2 tables (topology_edges_v1 + service_stats_v1) with ReplacingMergeTree+FINAL idempotency; full UI scope (Overview cards + Service detail + /topology + /traces/:id Service Map body) MINUS ⌘K which de-scoped to SLICE-3.5; d3-force + hand-rolled SVG (consistent with SLICE-1 waterfall); external nodes via peer.service/db.system/messaging.system/http.host COALESCE; fixed-bucket time window 15m/1h/6h/24h; per-trace Service Map = client-side derive (zero new endpoint). 4th binary cmd/topo-engine on :8084; 2 new Caddy handles; zero nginx change (D4 still closed). 10 ACs. Next: writing-plans for docs/plans/2026-05-27-slice-3-plan.md."
+    },
+    {
+      "date": "2026-05-27",
+      "event": "SLICE-3 plan landed (docs/plans/2026-05-27-slice-3-plan.md) — 15 tasks with 100% AC coverage gate. Subagent-driven execution mode chosen. Status proposed → building."
     }
   ],
   "legend": {
@@ -225,7 +229,7 @@
       "id": "SLICE-3",
       "title": "Services + Topology — cmd/topo-engine + 2 CH aggregation tables + 3 new Query API endpoints + 4 new frontend pages",
       "priority": "P0",
-      "status": "proposed",
+      "status": "building",
       "current_state": "SLICE-2 done; trace + log verticals work. No service-to-service edge derivation; no per-service RED aggregation; topology_edges_v1 and service_stats_v1 tables don't exist; no /api/v1/services or /api/v1/topology routes; no /overview, /services/:name, or /topology frontend pages; /traces/:id Service Map subtab is a 'Coming in SLICE-3' NEmpty placeholder; SideBar overview/services/topology entries are to:null. cmd/topo-engine binary does not exist; chquery.AdminConn does not exist.",
       "target_state": "cmd/topo-engine runs as 4th docker-compose service on :8084 admin; every 1min processes the latest closed bucket [T-2min, T-1min); reads traces_v1 via SELF JOIN; writes topology_edges_v1 (per pair) + service_stats_v1 (per service x span_kind). Cold-start Catchup replays missing buckets up to TOPO_CATCHUP_MAX=1h gap. cmd/query :8081 gains /api/v1/services (list+RED), /api/v1/services/{name} (stats+inbound+outbound deps), /api/v1/topology (nodes+edges for force-directed graph). Caddy adds 2 handle blocks (zero nginx change). Frontend ships /overview (service cards, RED color rings), /services/:name (NTabs: Signals + Dependencies + 4 ComingSoonTab placeholders), /topology (global force-directed graph via d3-force + hand-rolled SVG, ≤100 nodes), /traces/:id Service Map subtab body (client-side derived from in-memory spans). Shared <ServiceGraph> component reused 3 places. ?window= URL param drives 15m/1h/6h/24h fixed buckets across all 3 new pages. SideBar overview/services/topology entries enabled. Cross-tenant integration test (6 sub-assertions) asserts tenant B cannot see tenant A's services or topology.",
       "acceptance_criteria": [
