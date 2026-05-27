@@ -236,7 +236,7 @@
       "status": "done",
       "completed_at": "2026-05-27",
       "evidence": {
-        "commits_range": "7f0f09d..<T15 SHA>",
+        "commits_range": "7f0f09d..3308b9b",
         "task_count": 15,
         "ac_summary": "10/10 ACs verified. AC #2/#3 via CH SHOW CREATE TABLE + system.row_policies (both tenant_isolation_topology_edges_v1 + tenant_isolation_service_stats_v1 attached). AC #1/#4 via Go integration tests (TestTopoEngine_RunOnce_WritesEdgesAndStats, Idempotency_DoubleRun, Catchup_FromLastCompleted, CannotWriteEdgeAcrossTenant — all PASS via dockertest). AC #5/#6/#7 via services_repo_test + topology_repo_test + handler unit tests + live curl through Caddy. AC #8 via Caddy handle blocks present + zero nginx changes (D4 stays closed) + live verification curl through https://localhost. AC #9 via vitest 89/89 (incl. ServiceGraph + TimeWindowPicker suppressNextWatch + Overview + ServiceDetail + Topology + ServiceMapPanel + 3 new api regression specs) + Playwright topology/overview/service-detail specs (13 specs). AC #10 via TestSlice3_CrossTenantTopology 6 sub-assertions + write isolation + idempotency + Playwright cross-tenant assertions for all 4 new pages.",
         "evidence_file": "deploy/SLICE-3-evidence.txt",
