@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS topology_edges_v1 (
     p95_duration   UInt64 CODEC(T64, LZ4)
 ) ENGINE = ReplacingMergeTree
 PARTITION BY (tenant_id, toYYYYMMDD(ts_bucket))
-ORDER BY (tenant_id, ts_bucket, caller_service, callee_service, callee_kind)
+ORDER BY (tenant_id, ts_bucket, caller_service, caller_kind, callee_service, callee_kind)
 SETTINGS index_granularity = 8192;
 
 CREATE ROW POLICY IF NOT EXISTS tenant_isolation_topology_edges_v1 ON topology_edges_v1
-    USING tenant_id = getSetting('custom_tenant_id') TO openaiops;
+    USING tenant_id = getSetting('custom_tenant_id')
+    TO openaiops;

@@ -32,7 +32,7 @@ Query/Exec.
 Template — paste into the migration file that creates the table:
 
 ```sql
-CREATE ROW POLICY tenant_isolation_<table_name> ON <table_name>
+CREATE ROW POLICY IF NOT EXISTS tenant_isolation_<table_name> ON <table_name>
     USING tenant_id = getSetting('custom_tenant_id')
     TO openaiops;
 ```
@@ -40,12 +40,12 @@ CREATE ROW POLICY tenant_isolation_<table_name> ON <table_name>
 Example for the SLICE-1 `traces_v1` migration:
 
 ```sql
-CREATE TABLE traces_v1 (
+CREATE TABLE IF NOT EXISTS traces_v1 (
     tenant_id LowCardinality(String),
     -- ... other columns ...
 ) ENGINE = MergeTree ORDER BY (tenant_id, service, ts);
 
-CREATE ROW POLICY tenant_isolation_traces_v1 ON traces_v1
+CREATE ROW POLICY IF NOT EXISTS tenant_isolation_traces_v1 ON traces_v1
     USING tenant_id = getSetting('custom_tenant_id')
     TO openaiops;
 ```

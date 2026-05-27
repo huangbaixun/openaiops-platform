@@ -156,11 +156,12 @@ CREATE TABLE IF NOT EXISTS topology_edges_v1 (
     p95_duration   UInt64 CODEC(T64, LZ4)             -- nanoseconds
 ) ENGINE = ReplacingMergeTree
 PARTITION BY (tenant_id, toYYYYMMDD(ts_bucket))
-ORDER BY (tenant_id, ts_bucket, caller_service, callee_service, callee_kind)
+ORDER BY (tenant_id, ts_bucket, caller_service, caller_kind, callee_service, callee_kind)
 SETTINGS index_granularity = 8192;
 
 CREATE ROW POLICY IF NOT EXISTS tenant_isolation_topology_edges_v1 ON topology_edges_v1
-    USING tenant_id = getSetting('custom_tenant_id') TO openaiops;
+    USING tenant_id = getSetting('custom_tenant_id')
+    TO openaiops;
 ```
 
 ### `service_stats_v1`
@@ -188,7 +189,7 @@ CREATE ROW POLICY IF NOT EXISTS tenant_isolation_service_stats_v1 ON service_sta
 ### Schema choices
 
 - **`ReplacingMergeTree`** — topo-engine re-runs cleanly: same `(tenant_id, ts_bucket, caller, callee, callee_kind)` written twice → background MERGE keeps the latest version. Queries use `FROM … FINAL` for the post-merge view; we **do not** schedule `OPTIMIZE … FINAL` (too costly). The aggregation SQL (Pass A and Pass B) is deterministic — same input rows yield same output — so the "latest version" is the correct version regardless of which run wrote it. ([cite: §B brainstorming recommendation])
-- **`ORDER BY (tenant_id, ts_bucket, …)`** — `ts_bucket` second (not `service` like `traces_v1`) because the primary access pattern is "all-services in a time window," not "one-service over time."
+- **`ORDER BY (tenant_id, ts_bucket, caller_service, caller_kind, callee_service, callee_kind)`** — `ts_bucket` second (not `service` like `traces_v1`) because the primary access pattern is "all-services in a time window," not "one-service over time." `caller_kind` is included in the ORDER BY for forward-compatibility — in `ReplacingMergeTree`, ORDER BY is the dedup key, so future writes that emit non-`'service'` caller kinds will not silently dedupe. Pass A always writes `caller_kind = 'service'` today; this is defense-in-depth.
 - **`PARTITION BY (tenant_id, toYYYYMMDD(ts_bucket))`** — same template as `traces_v1` / `logs_v1`. Because these tables are aggregated (1min granularity), partition pressure is far below the trace/log volume — at 1min × ~50 services × 24h ≈ 72k rows per tenant per day, the 1000-partition CH soft ceiling is irrelevant here.
 - **`callee_kind` in ORDER BY** — a single `(caller, callee)` pair may legitimately appear twice (once as `service`, once as `external` — e.g., `checkout → redis` could exist both as an external db call AND as an instrumented service call if a tenant runs an OTLP-instrumented redis wrapper). The kind disambiguates.
 - **No skip indexes** — the tables are small enough that primary key scan is fast. Add if production query patterns demand.

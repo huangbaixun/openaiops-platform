@@ -1,4 +1,5 @@
 -- service_stats_v1: SLICE-3 per-service RED aggregation (1min buckets, split by span_kind).
+-- IF NOT EXISTS on both DDLs for ch-migrate runner replay-safety (SLICE-1 T1 lesson).
 CREATE TABLE IF NOT EXISTS service_stats_v1 (
     tenant_id     LowCardinality(String),
     ts_bucket     DateTime CODEC(Delta, ZSTD(1)),
