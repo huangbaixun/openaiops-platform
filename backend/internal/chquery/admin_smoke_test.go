@@ -58,12 +58,16 @@ func TestAdminConn_ListTenants_AcrossTenants(t *testing.T) {
 	require.NoError(t, err, "AdminQuery must not error — that's T2's core contract")
 	defer rows.Close()
 
-	// Drain to ensure the driver doesn't surface an error mid-stream.
+	var rowCount int
 	for rows.Next() {
 		var tid string
 		require.NoError(t, rows.Scan(&tid))
+		rowCount++
 	}
 	require.NoError(t, rows.Err())
+	require.Equal(t, 0, rowCount,
+		"AdminConn's empty-sentinel custom_tenant_id should filter all rows under a Row-Policy-bound test user; "+
+			"see prod requirement in admin.go comments")
 }
 
 func seedTraceForTenant(t *testing.T, conn *chquery.Conn, tidStr string) {

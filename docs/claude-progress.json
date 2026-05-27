@@ -87,6 +87,12 @@
       "item": "cmd/seed-traces honors INGESTER_OTLP_GRPC_HOST_PORT but doesn't auto-discover. Manual env var needed on machines with port collisions (e.g., this dev machine uses 14317 due to .env override).",
       "severity": "low",
       "tracked_in": "SLICE-1-evidence.txt D3 + SLICE-2-evidence.txt D3"
+    },
+    {
+      "date": "2026-05-27",
+      "item": "AdminConn cross-tenant visibility in production requires the CH user (used by topo-engine) to be exempted from tenant_isolation_* Row Policies. Currently undocumented in IaC; CLAUDE.md doesn't mention this prod requirement. SLICE-3 T8 deploy task should encode this (DDL adding the bypass policy or a comment on the CH user's GRANT block).",
+      "severity": "medium",
+      "tracked_in": "SLICE-3 T2 review (commit 442be9f) + admin.go AdminConn godoc"
     }
   ],
   "open_questions": [

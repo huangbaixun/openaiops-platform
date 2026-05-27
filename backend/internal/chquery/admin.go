@@ -67,14 +67,12 @@ func (k AdminQueryKind) sql() string {
 // Construction is restricted to packages allowed by deploy/lint-no-bare-ch.sh —
 // currently only internal/topoengine/. Direct construction elsewhere fails CI.
 //
-// AdminConn does NOT inject custom_tenant_id session settings; queries it
-// runs must not touch tables protected by tenant_isolation_* Row Policies
-// in a tenant-bound way. The whitelisted kinds above are vetted to comply
-// (they either scan across tenants on purpose or aggregate already-bucketed
-// pre-aggregates that the Row Policy permits via getSetting(''), which CH
-// evaluates as the empty string and the policy then filters as "no rows" —
-// callers must be aware and either be allowed by ALTER POLICY or scope
-// queries explicitly by tenant_id arg).
+// AdminConn injects an empty-sentinel `custom_tenant_id` setting (see
+// `adminSentinelTenantID`) rather than a real tenant ID, so it bypasses
+// MustTenantScope but still satisfies the CH UNKNOWN_SETTING constraint.
+// In production this requires the CH user to be exempted from
+// `tenant_isolation_*` Row Policies (operator concern, tracked in
+// progress.json known_drift).
 type AdminConn struct {
 	c *Conn
 }

@@ -51,6 +51,20 @@ func TestAdminConn_AdminQuery_RejectsUnknownKind(t *testing.T) {
 	}
 }
 
+func TestAdminConn_AdminQueryRow_RejectsUnknownKind(t *testing.T) {
+	ac := NewAdminConn(&Conn{})
+	row := ac.AdminQueryRow(context.Background(), AdminQueryKind(9999))
+	var v string
+	err := row.Scan(&v)
+	if err == nil {
+		t.Fatalf("AdminQueryRow with unknown kind should return errRow whose Scan errors, got nil")
+	}
+	if !contains(err.Error(), "chquery: unknown AdminQueryKind") {
+		t.Fatalf("AdminQueryRow Scan err = %q, want unknown-kind", err.Error())
+	}
+}
+
+// contains avoids importing strings for a single call in this small test file.
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
