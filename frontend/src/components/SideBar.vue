@@ -3,11 +3,11 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 const { t } = useI18n()
 const items: { key: string; label: string; to: string | null }[] = [
-  { key: 'overview', label: 'nav.overview', to: null },
-  { key: 'services', label: 'nav.services', to: null },
+  { key: 'overview', label: 'nav.overview', to: '/overview' },
+  { key: 'services', label: 'nav.services', to: '/overview' },
   { key: 'traces', label: 'nav.traces', to: '/traces' },
   { key: 'logs', label: 'nav.logs', to: '/logs' },
-  { key: 'topology', label: 'nav.topology', to: null },
+  { key: 'topology', label: 'nav.topology', to: '/topology' },
   { key: 'alerts', label: 'nav.alerts', to: null },
   { key: 'settings', label: 'nav.settings', to: null },
 ]

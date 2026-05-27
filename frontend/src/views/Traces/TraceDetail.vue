@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { NTabs, NTabPane, NEmpty, NSpin } from 'naive-ui'
 import WaterfallChart from './WaterfallChart.vue'
+import ServiceMapPanel from './ServiceMapPanel.vue'
 import LogsPanel from '../../components/LogsPanel.vue'
 import { useTraceDetail } from '../../composables/useTraces'
+import type { GraphNode } from '../../components/ServiceGraph/types'
 
 const props = defineProps<{ traceId: string }>()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 const { detail, loading, load } = useTraceDetail()
 const active = ref<'waterfall' | 'json' | 'serviceMap' | 'logs'>('waterfall')
@@ -30,6 +33,12 @@ function onSpanClick(spanId: string) {
 function clearSpan() {
   selectedSpanId.value = null
 }
+
+function onServiceMapClick(n: GraphNode) {
+  // V1: set ?focus_service=X so Waterfall can scroll. Waterfall integration is post-MVP.
+  const q = { ...route.query, focus_service: n.service }
+  void router.replace({ query: q })
+}
 </script>
 
 <template>
@@ -49,10 +58,12 @@ function clearSpan() {
         </NTabPane>
 
         <NTabPane name="serviceMap" :tab="t('traces.tabServiceMap')">
-          <NEmpty
-            :description="t('traces.serviceMapComingSoon')"
-            data-testid="service-map-placeholder"
+          <ServiceMapPanel
+            v-if="detail"
+            :spans="detail.spans"
+            @node-click="onServiceMapClick"
           />
+          <NEmpty v-else />
         </NTabPane>
 
         <NTabPane name="logs" :tab="t('logs.tab')">

@@ -27,6 +27,22 @@ const router = createRouter({
           name: 'logs',
           component: () => import('../views/Logs/LogsView.vue'),
         },
+        {
+          path: 'overview',
+          name: 'overview',
+          component: () => import('../views/Overview/OverviewPage.vue'),
+        },
+        {
+          path: 'services/:name',
+          name: 'service-detail',
+          component: () => import('../views/Services/ServiceDetail.vue'),
+          props: true,
+        },
+        {
+          path: 'topology',
+          name: 'topology',
+          component: () => import('../views/Topology/TopologyPage.vue'),
+        },
       ],
     },
   ],
