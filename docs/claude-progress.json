@@ -96,9 +96,9 @@
     },
     {
       "date": "2026-05-27",
-      "item": "frontend/src/components/ServiceGraph/useForceSimulation.ts: vue-tsc fails (TS2344) because GraphEdge.source/target are typed `string | GraphNode | undefined` but d3-force's SimulationLinkDatum requires the property to be non-undefined. Vitest passes (76/76) and vite dev/preview run fine; only `npm run build` (which prepends vue-tsc -b) fails. Pre-existed before T13 (introduced by T10 commit 662e3e1). Fix is to mark source/target as required (drop the `?`) in components/ServiceGraph/types.ts and either initialize them or let d3 do it at runtime; small follow-up.",
+      "item": "RESOLVED 2026-05-27: frontend/src/components/ServiceGraph/useForceSimulation.ts TS2344 (vue-tsc) cleared by making GraphNode extend SimulationNodeDatum and introducing a SimEdge (extends SimulationLinkDatum<GraphNode>) for the d3-force generic, while GraphEdge keeps caller/callee + optional source/target for API callers. useForceSimulation maps GraphEdge -> SimEdge before forceLink. `npm run build` now clean; vitest 76/76 PASS.",
       "severity": "low",
-      "tracked_in": "SLICE-3 T13 implementer note (this entry)"
+      "tracked_in": "SLICE-3 T13 implementer note + T13 review fix commit"
     }
   ],
   "open_questions": [
