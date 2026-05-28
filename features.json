@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "description": "openaiops-platform feature ledger. Cross-session contract; status transitions are real product gates.",
-  "updated_at": "2026-05-27",
+  "updated_at": "2026-05-28",
   "owner": "@huangbaixun",
   "source": "Pivoted from archived OpenAIOps repo per its ADR-0007 (2026-05-24).",
   "history": [
@@ -60,6 +60,10 @@
     {
       "date": "2026-05-27",
       "event": "SLICE-3 done — 15 tasks, all 10 ACs verified. Services + topology vertical: cmd/topo-engine (4th binary on :8084) → 1min tick processes closed bucket → CH topology_edges_v1 + service_stats_v1 ReplacingMergeTree tables with FINAL idempotency → /api/v1/services{,/{name}} + /api/v1/topology on cmd/query → 4 new frontend pages (/overview, /services/:name 6-tab, /topology, /traces/:id Service Map subtab body via client-side derive). Shared <ServiceGraph> (d3-force + hand-rolled SVG) reused 3 places. Zero nginx changes (drift D4 stays closed). 9 bugs caught during execution incl. SLICE-3 T15 caught a SLICE-3 T11 regression (services.ts + topology.ts used raw fetch() and skipped the shared axios Bearer interceptor → 401 on every new page; locked by api/__tests__/client.spec.ts). One new known drift D6 (topo-engine AdminConn → activeTenants returns 0 in prod because Row Policy filters tenant discovery; needs CH user exemption — deployment concern, not code correctness). 26/26 Playwright PASS (incl. 13 new SLICE-3 specs); 21 vitest files / 89 tests PASS (+10 from T15 api/auth regression tests). See deploy/SLICE-3-evidence.txt."
+    },
+    {
+      "date": "2026-05-28",
+      "event": "PLATFORM-ASK-1/2/3 filed from openaiops-ai SLICE-0 design (sibling repo)"
     }
   ],
   "legend": {
@@ -290,6 +294,60 @@
       "estimated_effort_days": "21",
       "owner": "@huangbaixun",
       "notes": "Third vertical slice. First slice with a non-OTLP-receiving backend service (cmd/topo-engine). Introduces chquery.AdminConn for the tenant-discovery case (whitelisted SQL only, lint-confined to internal/topoengine/). External node inference via COALESCE on peer attributes is the second-biggest design choice after the 1min job-vs-MV decision. Drift D4 stays closed: zero nginx changes (this is the first slice that proves SLICE-2's promise that future query routes are one-line Caddy adds). ⌘K explicitly de-scoped during brainstorming after discovering the cmd palette skeleton was never built — Q2 'full scope' answer carried the assumption it existed. SLICE-3 plan should target 14-16 tasks (similar to SLICE-1's 16); 21-day estimate (vs ADR-0001's 5-week estimate) reflects two-Pass topo-engine job + shared graph component complexity offset by SLICE-1/2 helpers (chtest, suppressNextWatch pattern, ingestshared) being reusable."
+    },
+    {
+      "id": "PLATFORM-ASK-1",
+      "name": "service:ai API key scope + X-Tenant-Id header trust",
+      "priority": "P1",
+      "status": "proposed",
+      "spec": null,
+      "source": "Derived from openaiops-ai SLICE-0 spec §5.3 + §11.",
+      "description": "Add scope column to api_keys table. Gateway honors X-Tenant-Id header only when bearer has scope='service:ai'. Lets openaiops-ai operate cross-tenant with a single secret.",
+      "acceptance_criteria": [
+        "api_keys table has scope column (text NOT NULL); migration applied",
+        "scope='service:ai' key + X-Tenant-Id: <T> header against /api/v1/traces returns tenant T data",
+        "scope='tenant:<X>' key + X-Tenant-Id header is ignored (tenant pinned to key)",
+        "Regression: existing tenant-scoped keys continue working unchanged"
+      ],
+      "out_of_scope": ["per-key rate limits (separate ask)", "key management UI"],
+      "dependencies": [],
+      "technical_notes": "Aligns with platform spec §3.3. Slice-1 blocker for openaiops-ai. Without it, AI falls back to N per-tenant keys."
+    },
+    {
+      "id": "PLATFORM-ASK-2",
+      "name": "POST /api/v1/annotations endpoint",
+      "priority": "P1",
+      "status": "proposed",
+      "spec": null,
+      "source": "Derived from openaiops-ai SLICE-0 spec §5.1 + §11.",
+      "description": "Endpoint for openaiops-ai to write back RCA findings as annotations on trace/service/topology nodes. Display in platform UI when present.",
+      "acceptance_criteria": [
+        "POST /api/v1/annotations with {tenant_id, target_type, target_id, kind: 'ai_rca', payload, ts} returns 201 + annotation_id",
+        "Annotation visible as badge on the corresponding trace/service/topology node in UI",
+        "Cross-tenant write blocked (annotation tenant_id must match bearer scope or X-Tenant-Id header)",
+        "Idempotency-Key header dedupes within 24h"
+      ],
+      "out_of_scope": ["UI editing of annotations", "annotation comments/threads"],
+      "dependencies": ["PLATFORM-ASK-1"],
+      "technical_notes": "Used by openaiops-ai Slice 1 write-back. Spec §6 contract."
+    },
+    {
+      "id": "PLATFORM-ASK-3",
+      "name": "Notification channel type=ai-rca",
+      "priority": "P1",
+      "status": "proposed",
+      "spec": null,
+      "source": "Derived from openaiops-ai SLICE-0 spec §5.1 + §11.",
+      "description": "Within platform SLICE-4 (alerts), add notification channel kind 'ai-rca' that POSTs Alertmanager v2 payload to openaiops-ai /webhooks/alertmanager. Configurable per tenant.",
+      "acceptance_criteria": [
+        "notification_channels table accepts type='ai-rca' + target_url + per-channel api_key",
+        "When alert fires, payload POSTed with bearer + Idempotency-Key=alert_fingerprint",
+        "Delivery failures retried with exponential backoff; permanent failure surfaced in audit_log",
+        "Regression: existing Slack/SMTP channels work unchanged"
+      ],
+      "out_of_scope": ["AI receiving non-alert webhooks", "two-way ack from AI"],
+      "dependencies": [],
+      "technical_notes": "Lives within platform SLICE-4 scope; do not promote to its own slice."
     }
   ]
 }
