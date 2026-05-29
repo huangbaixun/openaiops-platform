@@ -299,8 +299,9 @@
       "id": "PLATFORM-ASK-1",
       "name": "service:ai API key scope + X-Tenant-Id header trust",
       "priority": "P1",
-      "status": "proposed",
+      "status": "done_with_concerns",
       "spec": null,
+      "evidence": "AC#1: scope column already shipped Slice-0 (backend/migrations/20260524000002_create_api_keys.sql, TEXT NOT NULL DEFAULT 'read-write') — no new migration needed. AC#2/#3/#4: auth boundary logic implemented in auth.Middleware (ScopeServiceAI gate + X-Tenant-Id resolution via new auth.TenantLookup interface) and verified by 5 new unit tests in internal/auth/middleware_test.go: ServiceAI_HonorsTenantHeader (adopts target tenant), NonServiceAI_IgnoresTenantHeader (pinned to key), ServiceAI_NoHeader_PinsToKeyTenant, ServiceAI_MalformedTenantHeader_400, ServiceAI_UnknownTenant_404. PGResolver.TenantByID added (+ErrTenantNotFound) with integration test TestPGResolver_TenantByID (compiles under -tags=integration; could NOT execute — docker daemon down on dev machine 2026-05-29). service:ai seed key added (deploy/seed.sql, plaintext test-key-ai, tenant ai-svc 9999...). CONCERN: live cross-tenant e2e ('returns tenant T data' end-to-end through cmd/query + CH) and the dockertest integration run are both pending a docker-up environment — see known_drift.",
       "source": "Derived from openaiops-ai SLICE-0 spec §5.3 + §11.",
       "description": "Add scope column to api_keys table. Gateway honors X-Tenant-Id header only when bearer has scope='service:ai'. Lets openaiops-ai operate cross-tenant with a single secret.",
       "acceptance_criteria": [

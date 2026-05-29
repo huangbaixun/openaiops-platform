@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/google/uuid"
+
 	"github.com/huangbaixun/openaiops-platform/backend/internal/apikey"
 	"github.com/huangbaixun/openaiops-platform/backend/internal/tenant"
 )
@@ -46,4 +48,26 @@ func (p *PGResolver) ResolveBearer(ctx context.Context, plain string) (apikey.Ap
 		}
 	}
 	return apikey.ApiKey{}, tenant.Tenant{}, errors.Join(ErrUnauthorized, sql.ErrNoRows)
+}
+
+// TenantByID resolves a tenant by id, satisfying auth.TenantLookup so the
+// middleware can honor X-Tenant-Id for service:ai keys (PLATFORM-ASK-1).
+// Returns ErrTenantNotFound when the id is unknown.
+func (p *PGResolver) TenantByID(ctx context.Context, id uuid.UUID) (tenant.Tenant, error) {
+	query := `
+		SELECT id, name, plan, rate_limit_per_min, data_retention_days, created_at
+		FROM tenants
+		WHERE id = $1
+	`
+	var t tenant.Tenant
+	err := p.db.QueryRowContext(ctx, query, id).Scan(
+		&t.ID, &t.Name, &t.Plan, &t.RateLimitPerMin, &t.DataRetentionDays, &t.CreatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return tenant.Tenant{}, ErrTenantNotFound
+	}
+	if err != nil {
+		return tenant.Tenant{}, err
+	}
+	return t, nil
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -76,4 +77,29 @@ func TestPGResolver_TwoTenants_NoCrossTalk(t *testing.T) {
 
 	_, _, err = r.ResolveBearer(ctx, "nope")
 	assert.Error(t, err)
+}
+
+// PLATFORM-ASK-1: PGResolver.TenantByID powers the service:ai X-Tenant-Id path.
+func TestPGResolver_TenantByID(t *testing.T) {
+	ctx := context.Background()
+	db, _ := sql.Open("pgx", pgDSN)
+	defer db.Close()
+	_, err := db.ExecContext(ctx, "TRUNCATE api_keys, tenants RESTART IDENTITY CASCADE")
+	require.NoError(t, err)
+
+	var tID string
+	require.NoError(t, db.QueryRowContext(ctx, "INSERT INTO tenants(name) VALUES('acme') RETURNING id").Scan(&tID))
+
+	r := auth.NewPGResolver(db)
+
+	id, err := uuid.Parse(tID)
+	require.NoError(t, err)
+
+	got, err := r.TenantByID(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, "acme", got.Name)
+	assert.Equal(t, id, got.ID)
+
+	_, err = r.TenantByID(ctx, uuid.New()) // valid uuid, absent row
+	assert.ErrorIs(t, err, auth.ErrTenantNotFound)
 }
