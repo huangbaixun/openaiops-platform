@@ -318,8 +318,10 @@
       "id": "PLATFORM-ASK-2",
       "name": "POST /api/v1/annotations endpoint",
       "priority": "P1",
-      "status": "building",
+      "status": "done_with_concerns",
       "spec": "docs/specs/2026-05-29-platform-ask-2-annotations-design.md",
+      "plan": "docs/plans/2026-05-29-platform-ask-2-annotations-plan.md",
+      "evidence": "8 TDD tasks, subagent-driven (commits b157cb7..189363f). PG annotations table (migration 20260529120000) + AnnotationsRepo (Insert with NULLIF idempotency + ON CONFLICT, List tenant-scoped) on cmd/query; POST/GET /v1/annotations handler; router gains db param; Caddy /api/v1/annotations* handle before gateway catch-all. Frontend: api/annotations.ts (shared client), useAnnotations composable, AnnotationBadge.vue, wired into TraceDetail (props.traceId), ServiceDetail (route.params.name), ServiceGraph node marker (n.service). AC#1: 201/200 verified by handler unit tests. AC#3: cross-tenant 403 + tenant-always-from-ctx verified by handler unit test + repo TenantIsolation integration test (compile-only). AC#4: idempotency verified by repo IdempotencyReturnsExisting integration test (compile-only) + handler 200-on-hit unit test. AC#2: badge wiring verified by vitest (96 pass) + npm run build typecheck; Playwright e2e written (frontend/e2e/annotations.spec.ts) but NOT executed. Final code review (no Critical) findings I-1/M-1/N-2 fixed in 189363f. CONCERNS: dockertest integration (TestAnnotationsRepo*) + Playwright e2e are compile/build-verified only — docker daemon down on dev machine 2026-05-29 (same posture as ASK-1 D7). e2e currently asserts only the service-detail badge, not trace/topology (drift D8).",
       "source": "Derived from openaiops-ai SLICE-0 spec §5.1 + §11.",
       "description": "Endpoint for openaiops-ai to write back RCA findings as annotations on trace/service/topology nodes. Display in platform UI when present.",
       "acceptance_criteria": [
