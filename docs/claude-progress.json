@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
-  "updated_at": "2026-05-27",
-  "active_branch": "main",
-  "current_focus": "SLICE-3 complete (15 tasks, 10/10 ACs verified). Services + topology vertical: cmd/topo-engine 4th binary on :8084 → ReplacingMergeTree topology_edges_v1 + service_stats_v1 with FINAL idempotency → /api/v1/services{,/{name}} + /api/v1/topology on cmd/query → 4 new frontend pages (/overview, /services/:name 6-tab, /topology, /traces/:id Service Map subtab body via client-side derive). Shared <ServiceGraph> (d3-force + hand-rolled SVG) reused 3 places. Zero nginx changes (D4 stays closed; SLICE-2's promise upheld). 26 Playwright + 89 vitest + full backend integration all PASS. Next: SLICE-4 brainstorming (metrics + alerts) — OR first dig into D6 (AdminConn CH-user Row Policy bypass deployment concern that prevents topo-engine from discovering tenants in dev/prod).",
+  "updated_at": "2026-05-29",
+  "active_branch": "feat/platform-asks-from-ai-slice-0",
+  "current_focus": "PLATFORM-ASK-1 (service:ai scope + X-Tenant-Id trust) implemented on branch feat/platform-asks-from-ai-slice-0, status done_with_concerns. AC#1 scope column was already shipped Slice-0 (no migration). Auth boundary: auth.Middleware now honors X-Tenant-Id ONLY when resolved key scope=='service:ai' (new auth.ScopeServiceAI const + auth.TenantLookup optional interface + auth.ErrTenantNotFound); malformed header → 400, unknown tenant → 404, non-ai key → header ignored (pinned to own tenant). PGResolver.TenantByID added. 5 new middleware unit tests + 1 resolver integration test (compiles, NOT run — docker daemon down 2026-05-29). service:ai seed key test-key-ai (tenant ai-svc) added to deploy/seed.sql. NOTE: frontend must follow https://huangbaixun.github.io/OpenAPM/ hi-fi design (saved to memory). Next: run integration + live cross-tenant e2e once docker is up (drift D7), then PLATFORM-ASK-2 (POST /api/v1/annotations, depends on ASK-1).",
   "open_tasks": [],
   "recently_completed": [
     {
@@ -79,6 +79,12 @@
     }
   ],
   "known_drift": [
+    {
+      "date": "2026-05-29",
+      "item": "PLATFORM-ASK-1 done_with_concerns: auth-layer logic fully unit-tested, but (a) the new PGResolver.TenantByID dockertest (TestPGResolver_TenantByID) only compiled — could not run because the dev machine's docker daemon was down; (b) the live cross-tenant e2e ('service:ai key + X-Tenant-Id: <T> returns tenant T data' end-to-end through cmd/query + CH) was not exercised. Run `cd backend && go test -tags=integration ./internal/auth/` and a curl/Playwright cross-tenant check once docker is up; promote ASK-1 to done.",
+      "severity": "medium",
+      "tracked_in": "D7"
+    },
     {
       "date": "2026-05-24",
       "item": "AC-7 (goose down rollback) has SQL but no automated CI test. Slice 1 should add a CI step that runs goose down after goose up and re-asserts the schema diff.",
