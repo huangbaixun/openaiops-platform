@@ -319,7 +319,7 @@
       "name": "POST /api/v1/annotations endpoint",
       "priority": "P1",
       "status": "proposed",
-      "spec": null,
+      "spec": "docs/specs/2026-05-29-platform-ask-2-annotations-design.md",
       "source": "Derived from openaiops-ai SLICE-0 spec §5.1 + §11.",
       "description": "Endpoint for openaiops-ai to write back RCA findings as annotations on trace/service/topology nodes. Display in platform UI when present.",
       "acceptance_criteria": [
