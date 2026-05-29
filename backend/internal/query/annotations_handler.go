@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -61,7 +62,7 @@ func (h *AnnotationsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "target_type must be one of trace,service", http.StatusBadRequest)
 		return
 	}
-	if req.TargetID == "" || req.Kind == "" || len(req.Payload) == 0 {
+	if req.TargetID == "" || req.Kind == "" || len(req.Payload) == 0 || bytes.Equal(bytes.TrimSpace(req.Payload), []byte("null")) {
 		http.Error(w, "target_id, kind, payload are required", http.StatusBadRequest)
 		return
 	}

@@ -75,3 +75,7 @@ These verification steps are tracked by SLICE-1 plan, not by this ADR.
 
 - PRE-3 (next): implements `internal/chquery.MustTenantScope` + CH Row Policy DDL + cross-tenant reverse E2E. Blocks SLICE-1 T4+ (any code path that reads/writes CH).
 - SLICE-1 plan (after PRE-3): scaffolds `cmd/query/`, `internal/query/traces`, the first ch-migration file, and the Caddy/compose changes from this ADR.
+
+## Amendment (2026-05-29, PLATFORM-ASK-2)
+
+`cmd/query` gained its first **write** endpoint — `POST /api/v1/annotations` (plus `GET`) — for AI RCA write-back. This is a deliberate, documented deviation from the gateway=write / query=read split above: annotations are low-volume PG metadata writes (not the high-throughput ingest path this ADR was protecting gateway CPU from) and are read in the same shape/process as the trace/service/topology data the badges attach to. Rationale and trade-offs: `docs/specs/2026-05-29-platform-ask-2-annotations-design.md` §"ADR-0003 deviation".

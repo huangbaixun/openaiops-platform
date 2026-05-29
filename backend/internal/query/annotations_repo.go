@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -60,6 +61,13 @@ func (r *AnnotationsRepo) Insert(ctx context.Context, tenantID uuid.UUID, in Ann
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return uuid.Nil, false, err
+	}
+	// We only reach here when INSERT ... DO NOTHING fired, which the partial
+	// unique index guarantees requires a non-empty idempotency_key. Guard the
+	// invariant explicitly so a future direct caller with an empty key can't
+	// silently 500 via an ErrNoRows from the wrong-shaped fallback query.
+	if idemKey == "" {
+		return uuid.Nil, false, fmt.Errorf("annotations: ON CONFLICT fired with empty idempotency key (invariant violation)")
 	}
 	// Conflict on a non-empty idempotency key: return the existing row.
 	const sel = `SELECT id FROM annotations WHERE tenant_id = $1 AND idempotency_key = $2`

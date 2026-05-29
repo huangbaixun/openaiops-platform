@@ -110,6 +110,16 @@ func TestAnnotationsHandler_Create_BadTimestamp_400(t *testing.T) {
 	}
 }
 
+func TestAnnotationsHandler_Create_NullPayload_400(t *testing.T) {
+	h := NewAnnotationsHandler(&fakeAnnStore{})
+	body := `{"target_type":"service","target_id":"x","kind":"ai_rca","payload":null,"ts":"2026-05-29T12:00:00Z"}`
+	w := httptest.NewRecorder()
+	h.Create(w, postReq(body))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("null payload must be 400, got %d", w.Code)
+	}
+}
+
 func TestAnnotationsHandler_List_RequiresTargetType(t *testing.T) {
 	h := NewAnnotationsHandler(&fakeAnnStore{})
 	r := withTenantCtx(httptest.NewRequest(http.MethodGet, "/v1/annotations", nil))
