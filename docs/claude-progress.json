@@ -3,9 +3,15 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-29",
   "active_branch": "feat/platform-asks-from-ai-slice-0",
-  "current_focus": "PLATFORM-ASK-1 (service:ai scope + X-Tenant-Id trust) implemented on branch feat/platform-asks-from-ai-slice-0, status done_with_concerns. AC#1 scope column was already shipped Slice-0 (no migration). Auth boundary: auth.Middleware now honors X-Tenant-Id ONLY when resolved key scope=='service:ai' (new auth.ScopeServiceAI const + auth.TenantLookup optional interface + auth.ErrTenantNotFound); malformed header → 400, unknown tenant → 404, non-ai key → header ignored (pinned to own tenant). PGResolver.TenantByID added. 5 new middleware unit tests + 1 resolver integration test (compiles, NOT run — docker daemon down 2026-05-29). service:ai seed key test-key-ai (tenant ai-svc) added to deploy/seed.sql. NOTE: frontend must follow https://huangbaixun.github.io/OpenAPM/ hi-fi design (saved to memory). Next: run integration + live cross-tenant e2e once docker is up (drift D7), then PLATFORM-ASK-2 (POST /api/v1/annotations, depends on ASK-1).",
+  "current_focus": "PLATFORM-ASK-1 + ASK-2 both landed done_with_concerns on branch feat/platform-asks-from-ai-slice-0 (commits 94e3299..189363f). ASK-1: auth.Middleware honors X-Tenant-Id only for scope=='service:ai' (ScopeServiceAI const + TenantLookup interface + PGResolver.TenantByID); seed key test-key-ai. ASK-2: POST/GET /api/v1/annotations on cmd/query backed by PG annotations table; shared <AnnotationBadge> + useAnnotations wired into TraceDetail/ServiceDetail/ServiceGraph. Built subagent-driven (8 tasks, fresh subagent + 2-stage review each, final code review). All unit tests + vitest(96) + full npm run build green. CONCERN across both: dockertest integration tests + Playwright e2e are compile/build-verified only (docker daemon down 2026-05-29). Frontend follows https://huangbaixun.github.io/OpenAPM/ hi-fi design (in memory). Next: (1) when docker is up, run backend -tags=integration ./internal/{auth,query}/ + Playwright e2e to promote ASK-1+ASK-2 to done (drift D7/D8); (2) PLATFORM-ASK-3 (notification channel type=ai-rca) lives inside SLICE-4 (alerts) per its note — do NOT promote to own slice.",
   "open_tasks": [],
   "recently_completed": [
+    {
+      "date": "2026-05-29",
+      "name": "PLATFORM-ASK-1 + PLATFORM-ASK-2 — openaiops-ai write-back contract (SLICE-0 design asks)",
+      "summary": "Two P1 asks from the openaiops-ai sibling repo's SLICE-0 design. ASK-1 (commit 94e3299): auth.Middleware honors X-Tenant-Id ONLY for scope=='service:ai' keys (new auth.ScopeServiceAI + auth.TenantLookup interface + auth.ErrTenantNotFound; malformed→400, unknown tenant→404, non-ai→header ignored); PGResolver.TenantByID; seed key test-key-ai (tenant ai-svc). scope column already existed from Slice-0 so AC#1 needed no migration. ASK-2 (commits b157cb7..189363f, 8 TDD tasks subagent-driven): PG annotations table (migration 20260529120000) + AnnotationsRepo (NULLIF idempotency + ON CONFLICT … WHERE idempotency_key IS NOT NULL DO NOTHING + return-existing) + POST/GET /v1/annotations handler on cmd/query (query.NewRouter gained a db param; first write endpoint on query — documented ADR-0003 deviation, amendment appended) + Caddy /api/v1/annotations* handle. Frontend: api/annotations.ts (shared client), useAnnotations composable, AnnotationBadge.vue (NaiveUI NTag+NModal, data-testid on span wrapper per NaiveUI trap), wired into TraceDetail/ServiceDetail/ServiceGraph node. Cross-tenant write blocked by reusing ASK-1's ctx tenant (never trusts body tenant_id). Final code review found no Critical; fixed I-1 (repo invariant guard), M-1 (reject null payload + regression test), N-2 (ADR amendment). All backend unit tests + 96 vitest + full npm run build green. Both done_with_concerns: dockertest integration + Playwright e2e compile/build-verified only (docker daemon down 2026-05-29).",
+      "evidence": "features.json PLATFORM-ASK-1.evidence + PLATFORM-ASK-2.evidence; commits 94e3299..189363f; docs/specs/2026-05-29-platform-ask-2-annotations-design.md"
+    },
     {
       "date": "2026-05-24",
       "name": "Slice 0 (Foundation) — full delivery",
@@ -32,6 +38,11 @@
     }
   ],
   "notes": [
+    {
+      "date": "2026-05-29",
+      "kind": "lesson",
+      "note": "ASK-2 subagent review: the per-task code-quality check for a Vue component (T7 AnnotationBadge) ran only the TARGETED vitest spec and passed, but the component+spec actually broke `npm run build` — the spec fixture's `target_type: 'service'` widened to string and failed vue-tsc. The break was only caught by the NEXT task's full-build verify. Lesson: for any frontend task, the per-task verification MUST include `npm run build` (full vue-tsc typecheck), not just `npx vitest run <one-spec>`. Targeted vitest uses esbuild and does NOT type-check. Bake `npm run build` into every frontend implementer/reviewer prompt's verify step."
+    },
     {
       "date": "2026-05-24",
       "kind": "lesson",
@@ -84,6 +95,24 @@
       "item": "PLATFORM-ASK-1 done_with_concerns: auth-layer logic fully unit-tested, but (a) the new PGResolver.TenantByID dockertest (TestPGResolver_TenantByID) only compiled — could not run because the dev machine's docker daemon was down; (b) the live cross-tenant e2e ('service:ai key + X-Tenant-Id: <T> returns tenant T data' end-to-end through cmd/query + CH) was not exercised. Run `cd backend && go test -tags=integration ./internal/auth/` and a curl/Playwright cross-tenant check once docker is up; promote ASK-1 to done.",
       "severity": "medium",
       "tracked_in": "D7"
+    },
+    {
+      "date": "2026-05-29",
+      "item": "PLATFORM-ASK-2 done_with_concerns: dockertest repo integration tests (TestAnnotationsRepo_InsertAndList / IdempotencyReturnsExisting / TenantIsolation in internal/query) + Playwright e2e (frontend/e2e/annotations.spec.ts) are compile/build-verified only — docker daemon down. Run `cd backend && go test -tags=integration -timeout 240s ./internal/query/` and `make up && make seed && (cd frontend && npx playwright test annotations.spec.ts)` once docker is up; promote ASK-2 to done.",
+      "severity": "medium",
+      "tracked_in": "D7"
+    },
+    {
+      "date": "2026-05-29",
+      "item": "PLATFORM-ASK-2 e2e coverage gap: frontend/e2e/annotations.spec.ts asserts the badge only on the service-detail page + the cross-tenant 403. The spec's testing strategy promised badge coverage on trace-detail and topology-node too. Add a trace annotation seed + TraceDetail navigation assertion and a graph-node-ann-* testid assertion when re-running e2e post-docker.",
+      "severity": "low",
+      "tracked_in": "D8"
+    },
+    {
+      "date": "2026-05-29",
+      "item": "PLATFORM-ASK-2 idempotency index uq_annotations_idem (tenant_id, idempotency_key) is unbounded — keys retained forever (the '24h dedupe' is satisfied as a retention floor). Add a periodic prune of idempotency_key values older than ~30d before the table grows operationally burdensome. Out of scope for ASK-2 by design.",
+      "severity": "low",
+      "tracked_in": "D9"
     },
     {
       "date": "2026-05-24",
