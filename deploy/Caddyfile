@@ -30,6 +30,11 @@ localhost {
 		reverse_proxy query:8081
 	}
 
+	handle /api/v1/annotations* {
+		uri strip_prefix /api
+		reverse_proxy query:8081
+	}
+
 	# All other /api/* go to gateway.
 	handle /api/* {
 		uri strip_prefix /api

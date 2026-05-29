@@ -51,7 +51,7 @@ func main() {
 	defer ch.Close()
 
 	resolver := auth.NewPGResolver(db)
-	router := query.NewRouter(resolver, ch)
+	router := query.NewRouter(resolver, ch, db)
 
 	srv := &http.Server{
 		Addr:              cfg.QueryListenAddr,

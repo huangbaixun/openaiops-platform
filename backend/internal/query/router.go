@@ -1,6 +1,7 @@
 package query
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -19,7 +20,7 @@ import (
 // /api before reverse-proxying (mirrors gateway). Direct hits on
 // :8081 must use /v1/... — the public-facing /api/v1/... path is
 // Caddy's responsibility.
-func NewRouter(resolver auth.Resolver, ch *chquery.Conn) *chi.Mux {
+func NewRouter(resolver auth.Resolver, ch *chquery.Conn, db *sql.DB) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID, chimiddleware.RealIP, chimiddleware.Recoverer)
 	r.Use(chimiddleware.Logger)
@@ -46,6 +47,11 @@ func NewRouter(resolver auth.Resolver, ch *chquery.Conn) *chi.Mux {
 
 		toph := NewTopologyHandler(NewTopologyRepo(ch))
 		r.Get("/v1/topology", toph.Get)
+
+		// PLATFORM-ASK-2: annotations write-back (PG-backed; see spec ADR-0003 deviation).
+		ah := NewAnnotationsHandler(NewAnnotationsRepo(db))
+		r.Post("/v1/annotations", ah.Create)
+		r.Get("/v1/annotations", ah.List)
 	})
 	return r
 }
