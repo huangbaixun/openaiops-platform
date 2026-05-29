@@ -4,6 +4,7 @@ package query_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/ory/dockertest/v3"
+	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/require"
 
 	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
@@ -19,6 +23,34 @@ import (
 
 // dsn for the shared CH fixture; set by TestMain.
 var dsn string
+
+var annotationsPGDSN string
+
+// startPG is called from TestMain to provide a PG instance for the
+// annotations repo integration tests (the rest of the package uses CH).
+func startPG() func() {
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("dockertest pool: %v", err)
+	}
+	res, err := pool.RunWithOptions(&dockertest.RunOptions{
+		Repository: "postgres", Tag: "16-alpine",
+		Env: []string{"POSTGRES_PASSWORD=test", "POSTGRES_DB=test"},
+	}, func(c *docker.HostConfig) { c.AutoRemove = true })
+	if err != nil {
+		log.Fatalf("dockertest pg run: %v", err)
+	}
+	annotationsPGDSN = fmt.Sprintf("postgres://postgres:test@localhost:%s/test?sslmode=disable",
+		res.GetPort("5432/tcp"))
+	if err := pool.Retry(func() error {
+		db, _ := sql.Open("pgx", annotationsPGDSN)
+		defer db.Close()
+		return db.Ping()
+	}); err != nil {
+		log.Fatalf("pg not ready: %v", err)
+	}
+	return func() { _ = pool.Purge(res) }
+}
 
 // fatalReporter routes chtest.StartCH failures to log.Fatalf since TestMain
 // runs before any *testing.T exists. Satisfies chtest.FatalReporter.
@@ -35,8 +67,10 @@ func TestMain(m *testing.M) {
 		"20260527120100_create_service_stats_v1.sql",
 	)
 	dsn = fixture.DSN
+	stopPG := startPG()
 
 	code := m.Run()
+	stopPG()
 	_ = fixture.Close()
 	os.Exit(code)
 }
