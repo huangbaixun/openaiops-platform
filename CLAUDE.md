@@ -20,10 +20,10 @@
 
 ### 二进制 + 路由划分（ADR-0003）
 - gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/healthz`、`/livez`。依赖 PG。
-- query (`cmd/query`, :8081)：CH 读路径 — `/api/v1/traces*`、`/api/v1/logs*`、`/api/v1/services*`、`/api/v1/topology*`。依赖 PG (auth) + CH (data)。
+- query (`cmd/query`, :8081)：CH 读路径 — `/api/v1/traces*`、`/api/v1/logs*`、`/api/v1/services*`、`/api/v1/topology*`；外加唯一写端点 `/api/v1/annotations*`（AI RCA 回写，PG 存储，PLATFORM-ASK-2，ADR-0003 amendment）。依赖 PG (auth + annotations) + CH (data)。
 - ingester (`cmd/ingester`, :4317/:4318/:8082)：OTLP trace receiver。
 - log-ingester (`cmd/log-ingester`, :4327/:4328/:8083)：OTLP log receiver（mirrors cmd/ingester for logs, SLICE-2 起）。
-- Caddy :443 是 `/api/*` 的唯一入口（drift D4 in SLICE-2 closed）；frontend 容器仅 static SPA，不再 proxy /api。Caddy 用 `handle`（保留前缀）按路径分发 — `/api/v1/traces*` + `/api/v1/logs*` 优先匹配 query:8081，其它 `/api/*` 落 gateway:8080。
+- Caddy :443 是 `/api/*` 的唯一入口（drift D4 in SLICE-2 closed）；frontend 容器仅 static SPA，不再 proxy /api。Caddy 用 `handle`（保留前缀）按路径分发 — `/api/v1/traces*` + `/api/v1/logs*` + `/api/v1/services*` + `/api/v1/topology*` + `/api/v1/annotations*` 优先匹配 query:8081，其它 `/api/*` 落 gateway:8080。
 - 共享代码全在 `backend/internal/` — `auth`、`apikey`、`tenant`、`config`、`httpsrv`、`chquery`（PRE-3 实现）。`internal/query/` 和 `internal/ingest/` 下任何裸 `ch.Query(`/`ch.Exec(` 都 lint fail，必走 `chquery.MustTenantScope`。
 - metering 只在写路径写。查询请求**不**写 `metering_events`（页面刷新即烧额度=糟糕 UX，v0.1 决定）。
 
