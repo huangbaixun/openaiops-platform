@@ -9,10 +9,13 @@ import DependenciesTab from './DependenciesTab.vue'
 import ComingSoonTab from './ComingSoonTab.vue'
 import { useTimeWindow } from '../../composables/useTimeWindow'
 import { fetchServiceDetail, type ServiceDetail as Detail } from '../../api/services'
+import AnnotationBadge from '../../components/AnnotationBadge.vue'
+import { useAnnotations } from '../../composables/useAnnotations'
 
 const route = useRoute()
 const { windowVal } = useTimeWindow()
 const { t } = useI18n()
+const { annotations: svcAnnotations } = useAnnotations('service', () => String(route.params.name))
 const detail = ref<Detail | null>(null)
 const loading = ref(false)
 const notFound = ref(false)
@@ -32,7 +35,10 @@ onMounted(load); watch([() => route.params.name, windowVal], load)
 <template>
   <div class="service-detail">
     <div class="header">
-      <h2>{{ route.params.name }}</h2>
+      <div class="title">
+        <h2>{{ route.params.name }}</h2>
+        <AnnotationBadge :annotations="svcAnnotations" />
+      </div>
       <TimeWindowPicker />
     </div>
     <NAlert v-if="error" type="error">{{ error }}</NAlert>
@@ -51,4 +57,6 @@ onMounted(load); watch([() => route.params.name, windowVal], load)
 <style scoped>
 .service-detail { padding: 24px; }
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.title { display: flex; align-items: center; gap: 12px; }
+.title h2 { margin: 0; }
 </style>

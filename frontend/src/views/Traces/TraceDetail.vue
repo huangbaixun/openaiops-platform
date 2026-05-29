@@ -7,6 +7,8 @@ import WaterfallChart from './WaterfallChart.vue'
 import ServiceMapPanel from './ServiceMapPanel.vue'
 import LogsPanel from '../../components/LogsPanel.vue'
 import { useTraceDetail } from '../../composables/useTraces'
+import AnnotationBadge from '../../components/AnnotationBadge.vue'
+import { useAnnotations } from '../../composables/useAnnotations'
 import type { GraphNode } from '../../components/ServiceGraph/types'
 
 const props = defineProps<{ traceId: string }>()
@@ -14,6 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const { detail, loading, load } = useTraceDetail()
+const { annotations: traceAnnotations } = useAnnotations('trace', () => props.traceId)
 const active = ref<'waterfall' | 'json' | 'serviceMap' | 'logs'>('waterfall')
 const selectedSpanId = ref<string | null>(null)
 
@@ -43,6 +46,10 @@ function onServiceMapClick(n: GraphNode) {
 
 <template>
   <div class="trace-detail" data-testid="trace-detail-page">
+    <div class="header">
+      <h2>{{ props.traceId }}</h2>
+      <AnnotationBadge :annotations="traceAnnotations" />
+    </div>
     <NSpin :show="loading">
       <NTabs v-model:value="active" type="line" animated>
         <NTabPane name="waterfall" :tab="t('traces.tabWaterfall')">
@@ -80,6 +87,8 @@ function onServiceMapClick(n: GraphNode) {
 
 <style scoped>
 .trace-detail { padding: 24px; }
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.header h2 { margin: 0; font-size: 16px; word-break: break-all; }
 .trace-json {
   background: #0b0f15;
   color: #cbd5e1;

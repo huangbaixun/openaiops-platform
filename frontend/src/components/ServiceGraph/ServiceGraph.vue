@@ -4,13 +4,19 @@ import { useI18n } from 'vue-i18n'
 import { NEmpty } from 'naive-ui'
 import { useForceSimulation } from './useForceSimulation'
 import type { GraphNode, GraphEdge } from './types'
+import type { Annotation } from '../../api/annotations'
 
 const props = withDefaults(defineProps<{
   nodes: GraphNode[]
   edges: GraphEdge[]
   width?: number
   height?: number
-}>(), { width: 720, height: 480 })
+  annByService?: Record<string, Annotation[]>
+}>(), { width: 720, height: 480, annByService: () => ({}) })
+
+function annCount(svc: string): number {
+  return props.annByService[svc]?.length ?? 0
+}
 
 const emit = defineEmits<{ (e: 'node-click', n: GraphNode): void }>()
 
@@ -68,6 +74,13 @@ function edgeStroke(e: GraphEdge): string {
           <circle :cx="pos(n.service).x" :cy="pos(n.service).y"
                   :r="radius(n)" :fill="nodeFill(n)"
                   :stroke="nodeStroke(n)" :stroke-dasharray="nodeDash(n)" stroke-width="2" />
+          <circle v-if="annCount(n.service) > 0"
+                  :data-testid="`graph-node-ann-${n.service}`"
+                  :cx="pos(n.service).x + radius(n) - 2"
+                  :cy="pos(n.service).y - radius(n) + 2"
+                  r="4" fill="#f0a020" stroke="#fff" stroke-width="1">
+            <title>{{ annCount(n.service) }} AI annotation(s)</title>
+          </circle>
           <text :x="pos(n.service).x"
                 :y="pos(n.service).y + radius(n) + 14"
                 text-anchor="middle" font-size="12" fill="#111827">{{ n.service }}</text>

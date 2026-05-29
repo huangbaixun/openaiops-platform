@@ -7,6 +7,7 @@ import TimeWindowPicker from '../../components/TimeWindowPicker.vue'
 import ServiceGraph from '../../components/ServiceGraph/ServiceGraph.vue'
 import { useTimeWindow } from '../../composables/useTimeWindow'
 import { fetchTopology, type TopologyResponse } from '../../api/topology'
+import { fetchAnnotations, type Annotation } from '../../api/annotations'
 
 const router = useRouter()
 const { windowVal } = useTimeWindow()
@@ -14,6 +15,7 @@ const { t } = useI18n()
 const data = ref<TopologyResponse>({ window: '1h', nodes: [], edges: [] })
 const loading = ref(false)
 const error = ref<string | null>(null)
+const annByService = ref<Record<string, Annotation[]>>({})
 
 async function load() {
   loading.value = true; error.value = null
@@ -22,6 +24,16 @@ async function load() {
   finally { loading.value = false }
 }
 onMounted(load); watch(windowVal, load)
+
+onMounted(async () => {
+  try {
+    const all = await fetchAnnotations('service')
+    annByService.value = all.reduce<Record<string, Annotation[]>>((acc, a) => {
+      ;(acc[a.target_id] ??= []).push(a)
+      return acc
+    }, {})
+  } catch { /* badges are non-critical; ignore */ }
+})
 
 function go(n: { service: string; kind: string }) {
   if (n.kind === 'external') return
@@ -33,7 +45,7 @@ function go(n: { service: string; kind: string }) {
     <div class="header"><h2>{{ t('topology.title') }}</h2><TimeWindowPicker /></div>
     <NAlert v-if="error" type="error">{{ error }}</NAlert>
     <NSpin v-else-if="loading" />
-    <ServiceGraph v-else :nodes="data.nodes" :edges="data.edges" :width="900" :height="600" @node-click="go" />
+    <ServiceGraph v-else :nodes="data.nodes" :edges="data.edges" :ann-by-service="annByService" :width="900" :height="600" @node-click="go" />
   </div>
 </template>
 <style scoped>

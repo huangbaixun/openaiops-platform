@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AnnotationBadge from '../AnnotationBadge.vue'
+import type { Annotation } from '../../api/annotations'
 
-const sample = [
+const sample: Annotation[] = [
   { id: '1', target_type: 'service', target_id: 'checkout', kind: 'ai_rca',
     payload: { summary: 'db slow' }, ts: '2026-05-29T12:00:00Z', created_at: '2026-05-29T12:00:01Z' },
 ]
