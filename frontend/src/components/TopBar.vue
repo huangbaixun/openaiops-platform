@@ -17,7 +17,6 @@ const { windowVal, apply, allowed, intervalSec, setRefreshInterval } = useTimeWi
 
 const userMenuOpen = ref(false)
 const timeOpen = ref(false)
-const windowLabels: Record<TimeWindow, string> = { '15m': 'Last 15m', '1h': 'Last 1h', '6h': 'Last 6h', '24h': 'Last 24h' }
 
 function logout() { auth.logout(); void router.push({ name: 'login' }) }
 const initials = () => (auth.tenantName || '?').slice(0, 2).toUpperCase()
@@ -42,7 +41,7 @@ const initials = () => (auth.tenantName || '?').slice(0, 2).toUpperCase()
       <div class="dd" :class="{ open: timeOpen }">
         <button class="pill" data-testid="time-range" @click.stop="timeOpen = !timeOpen">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
-          <span class="k">时间</span><span class="v">{{ windowLabels[windowVal] }}</span>
+          <span class="k">时间</span><span class="v">{{ t(`timeWindow.${windowVal}`) }}</span>
         </button>
         <div class="dd-menu">
           <div
@@ -51,14 +50,14 @@ const initials = () => (auth.tenantName || '?').slice(0, 2).toUpperCase()
             :data-testid="`time-${w}`"
             @click="apply(w as TimeWindow); timeOpen = false"
           >
-            <span>{{ windowLabels[w as TimeWindow] }}</span><span class="kbd">{{ w }}</span>
+            <span>{{ t(`timeWindow.${w}`) }}</span><span class="kbd">{{ w }}</span>
           </div>
         </div>
       </div>
 
       <div class="refresh-group" :title="t('shell.autoRefresh')">
         <select :value="intervalSec" data-testid="auto-refresh" @change="(e) => setRefreshInterval(Number((e.target as HTMLSelectElement).value))">
-          <option :value="0">关闭</option>
+          <option :value="0">{{ t('shell.refreshOff') }}</option>
           <option :value="30">30s</option>
           <option :value="60">1m</option>
           <option :value="300">5m</option>

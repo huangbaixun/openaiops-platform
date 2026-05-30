@@ -13,7 +13,7 @@ import AnnotationBadge from '../../components/AnnotationBadge.vue'
 import { useAnnotations } from '../../composables/useAnnotations'
 
 const route = useRoute()
-const { windowVal } = useTimeWindow()
+const { windowVal, refreshTick } = useTimeWindow()
 const { t } = useI18n()
 const { annotations: svcAnnotations } = useAnnotations('service', () => String(route.params.name))
 const detail = ref<Detail | null>(null)
@@ -30,7 +30,7 @@ async function load() {
   } catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }
-onMounted(load); watch([() => route.params.name, windowVal], load)
+onMounted(load); watch([() => route.params.name, windowVal, refreshTick], load)
 </script>
 <template>
   <div class="service-detail">

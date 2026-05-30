@@ -24,6 +24,7 @@ export default {
     theme: 'Toggle theme',
     autoRefresh: 'Auto refresh',
     logout: 'Logout',
+    refreshOff: 'Off',
     defaultDomain: 'Default',
     domainReadonly: 'Tenant group (switching soon)',
     projectIsTenant: 'Current tenant',

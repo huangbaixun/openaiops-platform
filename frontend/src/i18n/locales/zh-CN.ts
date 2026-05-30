@@ -24,6 +24,7 @@ export default {
     theme: '切换主题',
     autoRefresh: '自动刷新',
     logout: '注销',
+    refreshOff: '关闭',
     defaultDomain: '默认域',
     domainReadonly: '租户分组（即将支持切换）',
     projectIsTenant: '当前租户',
