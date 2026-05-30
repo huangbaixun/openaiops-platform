@@ -3,7 +3,7 @@
   "description": "Cross-session progress tracker for Claude Code agent work on openaiops-platform. Pairs with features.json (status ledger) and lessons-learned (sediment).",
   "updated_at": "2026-05-29",
   "active_branch": "feat/platform-asks-from-ai-slice-0",
-  "current_focus": "PLATFORM-ASK-1 + ASK-2 both landed done_with_concerns on branch feat/platform-asks-from-ai-slice-0 (commits 94e3299..189363f). ASK-1: auth.Middleware honors X-Tenant-Id only for scope=='service:ai' (ScopeServiceAI const + TenantLookup interface + PGResolver.TenantByID); seed key test-key-ai. ASK-2: POST/GET /api/v1/annotations on cmd/query backed by PG annotations table; shared <AnnotationBadge> + useAnnotations wired into TraceDetail/ServiceDetail/ServiceGraph. Built subagent-driven (8 tasks, fresh subagent + 2-stage review each, final code review). All unit tests + vitest(96) + full npm run build green. CONCERN across both: dockertest integration tests + Playwright e2e are compile/build-verified only (docker daemon down 2026-05-29). Frontend follows https://huangbaixun.github.io/OpenAPM/ hi-fi design (in memory). Next: (1) when docker is up, run backend -tags=integration ./internal/{auth,query}/ + Playwright e2e to promote ASK-1+ASK-2 to done (drift D7/D8); (2) PLATFORM-ASK-3 (notification channel type=ai-rca) lives inside SLICE-4 (alerts) per its note — do NOT promote to own slice.",
+  "current_focus": "PLATFORM-ASK-1 + ASK-2 both DONE and merged to main (commits 94e3299..189363f, plus doc-sync 5e0e8a1). ASK-1: auth.Middleware honors X-Tenant-Id only for scope=='service:ai' (ScopeServiceAI const + TenantLookup interface + PGResolver.TenantByID); seed key test-key-ai. ASK-2: POST/GET /api/v1/annotations on cmd/query backed by PG annotations table; shared <AnnotationBadge> + useAnnotations wired into TraceDetail/ServiceDetail/ServiceGraph. FULLY VERIFIED 2026-05-30 (docker up): integration ./internal/{auth,query}/ PASS, unit PASS, frontend build+vitest 96 PASS, make up/seed/smoke PASS, Playwright 28/28 PASS. D7 closed (lesson: `make up` doesn't --build → stale images masked the route; rebuild before e2e). Frontend follows https://huangbaixun.github.io/OpenAPM/ hi-fi design (in memory). Open drift: D8 (e2e badge coverage only on service-detail, not trace/topology — low), D9 (idempotency-key pruning job — low). Next candidate work: PLATFORM-ASK-3 (notification channel type=ai-rca) lives inside SLICE-4 (alerts) per its note — do NOT promote to own slice. main is N commits ahead of origin/main (push pending user nod).",
   "open_tasks": [],
   "recently_completed": [
     {
@@ -91,15 +91,9 @@
   ],
   "known_drift": [
     {
-      "date": "2026-05-29",
-      "item": "PLATFORM-ASK-1 done_with_concerns: auth-layer logic fully unit-tested, but (a) the new PGResolver.TenantByID dockertest (TestPGResolver_TenantByID) only compiled — could not run because the dev machine's docker daemon was down; (b) the live cross-tenant e2e ('service:ai key + X-Tenant-Id: <T> returns tenant T data' end-to-end through cmd/query + CH) was not exercised. Run `cd backend && go test -tags=integration ./internal/auth/` and a curl/Playwright cross-tenant check once docker is up; promote ASK-1 to done.",
-      "severity": "medium",
-      "tracked_in": "D7"
-    },
-    {
-      "date": "2026-05-29",
-      "item": "PLATFORM-ASK-2 done_with_concerns: dockertest repo integration tests (TestAnnotationsRepo_InsertAndList / IdempotencyReturnsExisting / TenantIsolation in internal/query) + Playwright e2e (frontend/e2e/annotations.spec.ts) are compile/build-verified only — docker daemon down. Run `cd backend && go test -tags=integration -timeout 240s ./internal/query/` and `make up && make seed && (cd frontend && npx playwright test annotations.spec.ts)` once docker is up; promote ASK-2 to done.",
-      "severity": "medium",
+      "date": "2026-05-30",
+      "item": "RESOLVED D7: with docker up, ran `go test -tags=integration ./internal/{auth,query}/` (both PASS), full unit suite (PASS), frontend build+vitest 96 (PASS), `make up && make seed && make smoke` (PASS), and full Playwright e2e 28/28 (PASS incl. annotations.spec). ASK-1 + ASK-2 promoted to done. LESSON: `make up` runs `docker-compose up -d` WITHOUT --build, so it silently reuses stale per-service images. First e2e run 404'd on /api/v1/annotations and showed no badge because the running query+frontend images predated the feature commits; fixed via `docker-compose build query frontend && up -d --no-deps`. For any deploy/e2e verification of NEW code, run `make build` (or up --build) first — otherwise green local tests sit behind a stale stack. SECOND env note: seed-traces/seed-topology default to localhost:4317 but this dev box maps the ingester to 14317 (deploy/.env, SignOz collision) — pass `-target localhost:14317`.",
+      "severity": "resolved",
       "tracked_in": "D7"
     },
     {
