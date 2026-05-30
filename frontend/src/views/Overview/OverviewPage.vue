@@ -29,7 +29,7 @@ function go(service: string) { void router.push(`/services/${service}`) }
 </script>
 <template>
   <div class="overview">
-    <div class="header"><h2>{{ t('overview.title') }}</h2><TimeWindowPicker /></div>
+    <div class="section-h"><h3>{{ t('overview.title') }}</h3><TimeWindowPicker /></div>
     <NAlert v-if="error" type="error">{{ error }}</NAlert>
     <NSpin v-else-if="loading" />
     <div v-else class="grid" data-testid="overview-grid">
@@ -38,7 +38,6 @@ function go(service: string) { void router.push(`/services/${service}`) }
   </div>
 </template>
 <style scoped>
-.overview { padding: 24px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.overview { padding: 4px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 14px; }
 </style>

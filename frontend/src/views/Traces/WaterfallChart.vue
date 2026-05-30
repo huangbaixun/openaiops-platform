@@ -91,7 +91,8 @@ const layout = computed<{ rows: Laid[]; total: number; startNs: number; height: 
         :x="row.x + row.width + 4"
         :y="row.y + ROW_H - 8"
         font-size="11"
-        fill="#cbd5e1"
+        fill="currentColor"
+        style="color: var(--text-3)"
       >
         {{ row.span.operation }}
       </text>

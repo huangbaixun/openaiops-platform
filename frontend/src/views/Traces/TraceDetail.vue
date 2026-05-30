@@ -46,7 +46,7 @@ function onServiceMapClick(n: GraphNode) {
 
 <template>
   <div class="trace-detail" data-testid="trace-detail-page">
-    <div class="header">
+    <div class="section-h">
       <h2>{{ props.traceId }}</h2>
       <AnnotationBadge :annotations="traceAnnotations" />
     </div>
@@ -58,7 +58,7 @@ function onServiceMapClick(n: GraphNode) {
         </NTabPane>
 
         <NTabPane name="json" :tab="t('traces.tabJSON')">
-          <pre v-if="detail" class="trace-json" data-testid="trace-json">{{
+          <pre v-if="detail" class="code" data-testid="trace-json">{{
             JSON.stringify(detail, null, 2)
           }}</pre>
           <NEmpty v-else />
@@ -86,16 +86,6 @@ function onServiceMapClick(n: GraphNode) {
 </template>
 
 <style scoped>
-.trace-detail { padding: 24px; }
-.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.header h2 { margin: 0; font-size: 16px; word-break: break-all; }
-.trace-json {
-  background: #0b0f15;
-  color: #cbd5e1;
-  padding: 12px;
-  border-radius: 6px;
-  overflow: auto;
-  max-height: 70vh;
-  font-size: 12px;
-}
+.trace-detail { padding: 4px; }
+.section-h h2 { margin: 0; font-size: 16px; word-break: break-all; }
 </style>

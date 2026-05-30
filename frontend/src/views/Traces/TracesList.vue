@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NCard, NDataTable, NInput, NInputNumber, NButton, NSpace, NText } from 'naive-ui'
+import { NDataTable, NInput, NInputNumber, NButton, NText } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useTracesList } from '../../composables/useTraces'
@@ -55,44 +55,21 @@ watch(refreshTick, apply)
 
 <template>
   <div class="traces-list" data-testid="traces-page">
-    <h1>{{ t('traces.pageTitle') }}</h1>
-    <NCard>
-      <NSpace align="end">
-        <NInput
-          v-model:value="service"
-          :placeholder="t('traces.filterService')"
-          data-testid="filter-service"
-        />
-        <NInput
-          v-model:value="operation"
-          :placeholder="t('traces.filterOperation')"
-          data-testid="filter-operation"
-        />
-        <NInputNumber
-          v-model:value="minDurationMs"
-          :placeholder="t('traces.filterMinDuration')"
-          data-testid="filter-min-duration"
-        />
-        <NButton type="primary" data-testid="filter-apply" @click="apply">
-          {{ t('traces.filterApply') }}
-        </NButton>
-      </NSpace>
-    </NCard>
-    <NDataTable
-      :columns="columns"
-      :data="items"
-      :loading="loading"
-      :row-props="rowProps"
-      :bordered="false"
-      data-testid="traces-table"
-    />
-    <NText v-if="items.length === 0 && !loading" depth="3">
-      {{ t('traces.empty') }}
-    </NText>
+    <div class="section-h"><h3>{{ t('traces.pageTitle') }}</h3></div>
+    <div class="card">
+      <div class="pfilter">
+        <NInput v-model:value="service" data-testid="filter-service" :placeholder="t('traces.filterService')" />
+        <NInput v-model:value="operation" data-testid="filter-operation" :placeholder="t('traces.filterOperation')" />
+        <NInputNumber v-model:value="minDurationMs" data-testid="filter-min-duration" :placeholder="t('traces.filterMinDuration')" />
+        <NButton type="primary" data-testid="filter-apply" @click="apply">{{ t('traces.filterApply') }}</NButton>
+      </div>
+    </div>
+    <NDataTable class="tbl-wrap" :columns="columns" :data="items" :loading="loading" :row-props="rowProps" data-testid="traces-table" />
+    <NText v-if="items.length === 0 && !loading" depth="3">{{ t('traces.empty') }}</NText>
     <NText v-if="hasMore" depth="3">{{ t('traces.hasMore') }}</NText>
   </div>
 </template>
 
 <style scoped>
-.traces-list { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.traces-list { padding: 4px; display: flex; flex-direction: column; gap: 14px; }
 </style>
