@@ -351,6 +351,51 @@
       "out_of_scope": ["AI receiving non-alert webhooks", "two-way ack from AI"],
       "dependencies": [],
       "technical_notes": "Lives within platform SLICE-4 scope; do not promote to its own slice."
+    },
+    {
+      "id": "PLATFORM-UI-1",
+      "name": "Frontend UI refactor (align to OpenAPM hi-fi design)",
+      "priority": "P2",
+      "status": "proposed",
+      "spec": "docs/specs/2026-05-30-platform-ui-1-refactor-design.md",
+      "source": "User request 2026-05-30: refactor frontend UI to follow https://huangbaixun.github.io/OpenAPM/ (local clone /Users/huangbaixun/code_space/OpenAPM/).",
+      "description": "Feature A of a two-feature split. Port OpenAPM's shell chrome + component vocabulary (core.css/components.css) into the Vue app and restyle the six backend-wired pages (Overview/Traces/Logs/Topology/Service/Login) to match. Purely presentational: no api/composables/stores/router/backend changes. Adds theme toggle, ⌘K command palette, topbar time-range + auto-refresh, grouped collapsible sidebar. Topbar Domain/Project/Env selectors are built as a forward-compatible presentation layer (Project=current tenant real; Domain/Env read-only) to be wired by Feature B.",
+      "acceptance_criteria": [
+        "Sidebar renders OpenAPM's 3 nav groups with icons; 6 real pages navigate; backend-less items are disabled '即将上线' placeholders; collapse state persists",
+        "TopBar renders logo+brand+scope-pill+time-range+refresh-group+theme-toggle+language+avatar user-menu; logout works",
+        "Theme toggle switches light/dark via data-theme and persists across reload",
+        "⌘K command palette fuzzy-jumps to any page and to any service from the live list",
+        "Time-range control drives the 6 pages' existing query window; auto-refresh re-queries on interval",
+        "All 6 real pages restyled to OpenAPM vocabulary with every existing data-testid intact",
+        "Scope-pill shows Project=current tenant; Domain/Env present as read-only forward-compatible selectors with documented Feature-B seam",
+        "Existing 96 vitest + 28 Playwright remain green; npm run build passes; new shell unit/e2e tests pass"
+      ],
+      "out_of_scope": [
+        "Real Domain/Env/tenant switching + any backend change (-> PLATFORM-MT-1, Feature B, with ADR)",
+        "The 9 backend-less OpenAPM mock pages with fake data",
+        "design-annotations (?) overlay; mobile/responsive"
+      ],
+      "dependencies": [],
+      "technical_notes": "OpenAPM-CSS-first hybrid (DESIGN-DISCUSSION.md warns against antd/shadcn spacing). Keep NaiveUI only for NSpin/NModal/NSelect, themed. Pure presentational refactor => existing test suite is the regression guard. Forward-references PLATFORM-MT-1 for scope-pill wiring."
+    },
+    {
+      "id": "PLATFORM-MT-1",
+      "name": "Multi-tenant access model (domain/env/tenant switching)",
+      "priority": "P2",
+      "status": "proposed",
+      "spec": null,
+      "source": "User request 2026-05-30: full multi-tenant switching behind the OpenAPM topbar scope selectors. Decomposed out of PLATFORM-UI-1 as the security-critical backend half.",
+      "description": "Feature B. Change the auth model from 'one API key -> one tenant' to 'one user -> many tenants': add domain grouping + environment tagging to tenants (goose migration), user<->multi-tenant ACL, tenant-switch with re-auth + Row Policy re-scoping. Wires the forward-compatible scope-pill selectors built in PLATFORM-UI-1 to real switching. Requires its own ADR (auth-model change touching the day-1 multi-tenant isolation invariant).",
+      "acceptance_criteria": [
+        "tenants table gains domain + environment metadata (goose Up/Down migration)",
+        "A user can list and switch among tenants they are authorized for; switching re-scopes all queries (CH Row Policy + PG)",
+        "Cross-tenant isolation invariant preserved end-to-end (A-writes/B-reads => 0) across a switch",
+        "ADR documents the auth-model change from key-pinned to user-multi-tenant",
+        "PLATFORM-UI-1 scope-pill selectors wired to real domain/env/tenant switching"
+      ],
+      "out_of_scope": ["Per-service ACL (separate ask)", "team/squad aggregation tier"],
+      "dependencies": ["PLATFORM-UI-1"],
+      "technical_notes": "Security-critical: changes who can see which tenant (CLAUDE.md day-1 load-bearing invariant). Must have its own spec + ADR before implementation. Do NOT fold into the UI refactor."
     }
   ]
 }
