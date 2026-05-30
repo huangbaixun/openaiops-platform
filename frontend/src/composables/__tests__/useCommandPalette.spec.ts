@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { buildItems, fuzzyFilter } from '../useCommandPalette'
-import type { CmdItem as _CmdItem } from '../useCommandPalette'
 
 const services = [{ service: 'checkout' }, { service: 'payment' }, { service: 'redis-cache' }]
 const navigate = () => {}
