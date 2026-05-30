@@ -10,7 +10,7 @@ import { fetchTopology, type TopologyResponse } from '../../api/topology'
 import { fetchAnnotations, type Annotation } from '../../api/annotations'
 
 const router = useRouter()
-const { windowVal } = useTimeWindow()
+const { windowVal, refreshTick } = useTimeWindow()
 const { t } = useI18n()
 const data = ref<TopologyResponse>({ window: '1h', nodes: [], edges: [] })
 const loading = ref(false)
@@ -23,7 +23,7 @@ async function load() {
   catch (e: any) { error.value = e?.message ?? String(e) }
   finally { loading.value = false }
 }
-onMounted(load); watch(windowVal, load)
+onMounted(load); watch([windowVal, refreshTick], load)
 
 onMounted(async () => {
   try {

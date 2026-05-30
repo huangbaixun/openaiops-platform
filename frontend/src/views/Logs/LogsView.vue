@@ -5,11 +5,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { NCard, NInput, NSelect, NButton, NSpace, NText, NSpin, NDatePicker, NAlert } from 'naive-ui'
 import { useLogsList } from '../../composables/useLogs'
 import LogRow from '../../components/LogRow.vue'
+import { useTimeWindow } from '../../composables/useTimeWindow'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const { items, hasMore, loading, error, load } = useLogsList()
+const { refreshTick } = useTimeWindow()
 
 function readQueryArray(q: unknown): string[] {
   if (q == null) return []
@@ -97,6 +99,7 @@ watch(
 )
 
 onMounted(apply)
+watch(refreshTick, apply)
 </script>
 
 <template>

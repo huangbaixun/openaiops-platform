@@ -9,7 +9,7 @@ import { useTimeWindow } from '../../composables/useTimeWindow'
 import { fetchServices, type ServiceListItem } from '../../api/services'
 
 const router = useRouter()
-const { windowVal } = useTimeWindow()
+const { windowVal, refreshTick } = useTimeWindow()
 const { t } = useI18n()
 const items = ref<ServiceListItem[]>([])
 const loading = ref(false)
@@ -23,7 +23,7 @@ async function load() {
   finally { loading.value = false }
 }
 onMounted(load)
-watch(windowVal, load)
+watch([windowVal, refreshTick], load)
 
 function go(service: string) { void router.push(`/services/${service}`) }
 </script>

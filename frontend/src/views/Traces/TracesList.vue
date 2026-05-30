@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NCard, NDataTable, NInput, NInputNumber, NButton, NSpace, NText } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useTracesList } from '../../composables/useTraces'
 import type { TraceListItem } from '../../api/traces'
+import { useTimeWindow } from '../../composables/useTimeWindow'
 
 const { t } = useI18n()
 const router = useRouter()
 const { items, hasMore, loading, load } = useTracesList()
+const { refreshTick } = useTimeWindow()
 
 const service = ref('')
 const operation = ref('')
@@ -48,6 +50,7 @@ function rowProps(row: TraceListItem) {
 }
 
 onMounted(apply)
+watch(refreshTick, apply)
 </script>
 
 <template>
