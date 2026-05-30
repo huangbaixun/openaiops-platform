@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { NCard, NInput, NButton, NSelect, useMessage } from 'naive-ui'
+import { NInput, NButton, NSelect, useMessage } from 'naive-ui'
 import { useAuthStore } from '../stores/auth'
 import { setLocale } from '../i18n'
 
@@ -29,7 +29,9 @@ async function submit() {
 
 <template>
   <div class="login-page">
-    <NCard :title="t('login.title')" class="login-card">
+    <div class="card login-card">
+      <div class="login-logo">🪶</div>
+      <h2 class="login-title">{{ t('login.title') }}</h2>
       <div class="row">
         <label>{{ t('login.apiKey') }}</label>
         <NInput
@@ -57,7 +59,7 @@ async function submit() {
           data-testid="lang-select"
         />
       </div>
-    </NCard>
+    </div>
   </div>
 </template>
 
@@ -70,8 +72,15 @@ async function submit() {
 }
 .login-card {
   width: 360px;
-  background: var(--bg-elev-2);
-  box-shadow: var(--shadow-md);
+}
+.login-logo {
+  text-align: center;
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.login-title {
+  text-align: center;
+  margin: 0 0 20px;
 }
 .row { margin-bottom: 12px; }
 .row label { display: block; margin-bottom: 6px; color: var(--text-2); }

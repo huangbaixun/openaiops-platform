@@ -42,13 +42,14 @@ function go(n: { service: string; kind: string }) {
 </script>
 <template>
   <div class="topology">
-    <div class="header"><h2>{{ t('topology.title') }}</h2><TimeWindowPicker /></div>
+    <div class="section-h"><h2>{{ t('topology.title') }}</h2><TimeWindowPicker /></div>
     <NAlert v-if="error" type="error">{{ error }}</NAlert>
     <NSpin v-else-if="loading" />
-    <ServiceGraph v-else :nodes="data.nodes" :edges="data.edges" :ann-by-service="annByService" :width="900" :height="600" @node-click="go" />
+    <div v-else class="card">
+      <ServiceGraph :nodes="data.nodes" :edges="data.edges" :ann-by-service="annByService" :width="900" :height="600" @node-click="go" />
+    </div>
   </div>
 </template>
 <style scoped>
 .topology { padding: 24px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 </style>

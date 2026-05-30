@@ -34,7 +34,7 @@ onMounted(load); watch([() => route.params.name, windowVal], load)
 </script>
 <template>
   <div class="service-detail">
-    <div class="header">
+    <div class="section-h">
       <div class="title">
         <h2>{{ route.params.name }}</h2>
         <AnnotationBadge :annotations="svcAnnotations" />
@@ -56,7 +56,6 @@ onMounted(load); watch([() => route.params.name, windowVal], load)
 </template>
 <style scoped>
 .service-detail { padding: 24px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .title { display: flex; align-items: center; gap: 12px; }
 .title h2 { margin: 0; }
 </style>

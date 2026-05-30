@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NInput, NSelect, NButton, NSpace, NText, NSpin, NDatePicker, NAlert } from 'naive-ui'
+import { NInput, NSelect, NButton, NSpace, NText, NSpin, NDatePicker, NAlert } from 'naive-ui'
 import { useLogsList } from '../../composables/useLogs'
 import LogRow from '../../components/LogRow.vue'
 import { useTimeWindow } from '../../composables/useTimeWindow'
@@ -104,9 +104,9 @@ watch(refreshTick, apply)
 
 <template>
   <div class="logs-view" data-testid="logs-page">
-    <h1>{{ t('logs.title') }}</h1>
+    <h2 class="section-h">{{ t('logs.title') }}</h2>
 
-    <NCard>
+    <div class="card pfilter">
       <NSpace align="end" wrap>
         <NInput
           v-model:value="filterService"
@@ -151,7 +151,7 @@ watch(refreshTick, apply)
           {{ t('logs.filter.apply') }}
         </NButton>
       </NSpace>
-    </NCard>
+    </div>
 
     <NAlert v-if="error" type="error" :title="t('logs.errorTitle')" data-testid="logs-error">
       {{ error }}
@@ -183,9 +183,9 @@ watch(refreshTick, apply)
   gap: 16px;
 }
 .logs-list {
-  border: 1px solid var(--border, #eee);
-  border-radius: 6px;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .logs-empty {
   padding: 24px;

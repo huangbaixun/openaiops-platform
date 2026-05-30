@@ -87,8 +87,12 @@ function toggle() {
 <style scoped>
 .log-row {
   padding: 8px 12px;
-  border-bottom: 1px solid var(--border, #eee);
+  background: var(--bg-elev-0, #fff);
+  border: 1px solid var(--border, #eee);
+  border-radius: 6px;
+  margin-bottom: 4px;
   cursor: pointer;
+  transition: background 0.15s;
 }
 .log-row:hover {
   background: var(--bg-hover, rgba(0, 0, 0, 0.03));
