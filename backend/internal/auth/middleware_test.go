@@ -218,3 +218,70 @@ func TestMiddleware_ServiceAI_UnknownTenant_404(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
+
+// newDomainResolver builds: a `domain`-scoped key on homeTenant (domain D);
+// peerTenant also in D; otherTenant in a different domain.
+func newDomainResolver(t *testing.T) (f *fakeResolver, home, peer, other uuid.UUID, plain string) {
+	t.Helper()
+	domainD := uuid.New()
+	domainOther := uuid.New()
+	home, peer, other = uuid.New(), uuid.New(), uuid.New()
+	plain = "plain-domain-key"
+	hashed, err := apikey.Hash(plain)
+	require.NoError(t, err)
+	f = &fakeResolver{
+		keys: map[string]apikey.ApiKey{
+			hashed: {TenantID: home, Name: "dk", HashedKey: hashed, Scope: auth.ScopeDomain},
+		},
+		tenants: map[uuid.UUID]tenant.Tenant{
+			home:  {ID: home, Name: "shop-prod", DomainID: domainD},
+			peer:  {ID: peer, Name: "shop-staging", DomainID: domainD},
+			other: {ID: other, Name: "evil", DomainID: domainOther},
+		},
+	}
+	return f, home, peer, other, plain
+}
+
+func TestMiddleware_Domain_SwitchesWithinDomain(t *testing.T) {
+	f, _, peer, _, plain := newDomainResolver(t)
+	handler := auth.Middleware(f)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, err := auth.TenantID(r.Context())
+		require.NoError(t, err)
+		assert.Equal(t, peer, got, "domain key must adopt an in-domain target")
+		assert.Equal(t, auth.ScopeDomain, auth.Scope(r.Context()))
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces", nil)
+	req.Header.Set("Authorization", "Bearer "+plain)
+	req.Header.Set("X-Tenant-Id", peer.String())
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestMiddleware_Domain_OutOfDomain_403(t *testing.T) {
+	f, _, _, other, plain := newDomainResolver(t)
+	handler := auth.Middleware(f)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Fatal("handler must not run for an out-of-domain target")
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces", nil)
+	req.Header.Set("Authorization", "Bearer "+plain)
+	req.Header.Set("X-Tenant-Id", other.String())
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestMiddleware_Domain_NoHeader_PinsToOwn(t *testing.T) {
+	f, home, _, _, plain := newDomainResolver(t)
+	handler := auth.Middleware(f)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, _ := auth.TenantID(r.Context())
+		assert.Equal(t, home, got)
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/traces", nil)
+	req.Header.Set("Authorization", "Bearer "+plain)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}

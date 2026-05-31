@@ -24,6 +24,10 @@ var ErrTenantNotFound = errors.New("tenant not found")
 // See PLATFORM-ASK-1 / platform spec §3.3.
 const ScopeServiceAI = "service:ai"
 
+// ScopeDomain grants switching among tenants of the key's own domain via X-Tenant-Id,
+// validated by a shared non-NULL domain_id (PLATFORM-MT-1 / ADR-0004).
+const ScopeDomain = "domain"
+
 // HeaderTenantID names the header a service:ai caller uses to select the tenant
 // it is acting on behalf of.
 const HeaderTenantID = "X-Tenant-Id"
@@ -57,9 +61,9 @@ func Middleware(r Resolver) func(http.Handler) http.Handler {
 				return
 			}
 
-			// service:ai keys may target any tenant via X-Tenant-Id. Every other
-			// scope ignores the header entirely and stays pinned to its own tenant.
-			if k.Scope == ScopeServiceAI {
+			// service:ai → any tenant; domain → only within the key's own domain.
+			// Every other scope ignores the header and stays pinned to its own tenant.
+			if k.Scope == ScopeServiceAI || k.Scope == ScopeDomain {
 				if raw := req.Header.Get(HeaderTenantID); raw != "" {
 					target, err := resolveTargetTenant(req.Context(), r, raw)
 					switch {
@@ -73,17 +77,28 @@ func Middleware(r Resolver) func(http.Handler) http.Handler {
 						http.Error(w, "internal error", http.StatusInternalServerError)
 						return
 					}
+					if k.Scope == ScopeDomain && !tenantInDomain(target, tn) {
+						http.Error(w, "tenant not in your domain", http.StatusForbidden)
+						return
+					}
 					tn = target
 				}
 			}
 
 			ctx := WithTenant(req.Context(), tn.ID, tn.Name)
+			ctx = WithScope(ctx, k.Scope)
+			ctx = WithKeyID(ctx, k.ID)
 			next.ServeHTTP(w, req.WithContext(ctx))
 		})
 	}
 }
 
 var errBadTenantID = errors.New("malformed tenant id")
+
+// tenantInDomain reports whether target shares a non-NULL domain with key.
+func tenantInDomain(target, key tenant.Tenant) bool {
+	return key.DomainID != uuid.Nil && target.DomainID == key.DomainID
+}
 
 // resolveTargetTenant parses raw as a UUID and resolves it via the Resolver's
 // optional TenantLookup capability.
