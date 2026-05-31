@@ -39,7 +39,7 @@ func main() {
 	}
 
 	resolver := auth.NewPGResolver(db)
-	router := httpsrv.NewRouter(resolver)
+	router := httpsrv.NewRouter(resolver, db)
 
 	srv := &http.Server{
 		Addr:              cfg.GatewayListenAddr,
