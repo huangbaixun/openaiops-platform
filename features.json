@@ -453,6 +453,26 @@
       ],
       "dependencies": [],
       "technical_notes": "topo-engine already opens PG (cmd/topo-engine/main.go:55, Deps.PG) but never uses it. Both broken admin queries (activeTenants via AdminListTenants, lastCompletedBucket via AdminMaxBucket) move off AdminConn. Test CH user has ACCESS_MANAGEMENT=1 which masks the Row Policy, so the real D6 proof is the live ⌘K e2e on the dev stack. Fixes the issue that bit UI-1 + MT-1 e2e."
+    },
+    {
+      "id": "PLATFORM-ANN-1",
+      "name": "Annotations hardening (e2e badge coverage + idempotency-key prune)",
+      "priority": "P2",
+      "status": "proposed",
+      "spec": "docs/specs/2026-05-31-platform-ann-1-annotations-hardening-design.md",
+      "plan": null,
+      "source": "Closes known_drift D8 (annotation badge e2e only on service-detail) + D9 (unbounded idempotency_key index). ASK-2 follow-up.",
+      "description": "D8: extend frontend/e2e/annotations.spec.ts to assert the AI badge on trace-detail (seeded trace annotation) and the graph-node-ann-checkout marker on /topology (viable now D6 is fixed). D9: a background pruner goroutine in cmd/query nulls idempotency_key for annotations older than ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS (default 30; interval default 24h) so the partial unique index uq_annotations_idem stays bounded — annotation content preserved, dedupe lapses past the window. AnnotationsRepo.PruneIdempotencyKeys(ctx, days) is the maintenance method (intentionally tenant-unscoped retention; only clears keys). No schema change, no ADR.",
+      "acceptance_criteria": [
+        "annotations.spec.ts asserts the badge on trace-detail + the graph-node-ann-checkout marker on /topology, plus the existing service-detail + cross-tenant 403 cases",
+        "AnnotationsRepo.PruneIdempotencyKeys(ctx, days) nulls old idempotency_key, returns affected count, preserves content; dockertest integration proves old key nulled / recent kept / dedupe lapses for the old key",
+        "Background pruner in cmd/query runs on boot + every ANNOTATIONS_PRUNE_INTERVAL (default 24h) with retention default 30d, logs affected count, retries on failure without crashing, stops on shutdown",
+        "Config defaults unit-tested; all existing tests + full Playwright suite stay green",
+        "known_drift D8 + D9 closed"
+      ],
+      "out_of_scope": ["per-tenant retention policies", "deleting annotations (only key nulled)", "schema change / ADR", "prune-stats UI or metrics"],
+      "dependencies": ["PLATFORM-ASK-2", "PLATFORM-TOPO-1"],
+      "technical_notes": "D9 mechanism A chosen (cmd/query background goroutine) over B (ops cron CLI — no cron infra). Prune is `UPDATE annotations SET idempotency_key=NULL WHERE idempotency_key IS NOT NULL AND created_at < now() - (days||' days')::interval`. D8 needs the live seeded stack (traces + topology). Closes D8 + D9."
     }
   ]
 }
