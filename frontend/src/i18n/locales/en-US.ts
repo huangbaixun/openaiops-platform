@@ -29,6 +29,8 @@ export default {
     domainReadonly: 'Tenant group (switching soon)',
     projectIsTenant: 'Current tenant',
     envReadonly: 'Environment (switching soon)',
+    switchTenant: 'Switch tenant',
+    switchDenied: 'Not allowed to switch to that tenant',
   },
   login: {
     title: 'Sign in',

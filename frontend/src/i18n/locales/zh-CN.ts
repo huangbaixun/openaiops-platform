@@ -29,6 +29,8 @@ export default {
     domainReadonly: '租户分组（即将支持切换）',
     projectIsTenant: '当前租户',
     envReadonly: '部署环境（即将支持切换）',
+    switchTenant: '切换租户',
+    switchDenied: '无权切换到该租户',
   },
   login: {
     title: '登录',
