@@ -53,6 +53,11 @@ func main() {
 	resolver := auth.NewPGResolver(db)
 	router := query.NewRouter(resolver, ch, db)
 
+	pruneCtx, prunecancel := context.WithCancel(context.Background())
+	pruner := query.NewAnnotationsPruner(query.NewAnnotationsRepo(db),
+		cfg.AnnotationsRetentionDays, cfg.AnnotationsPruneInterval)
+	go pruner.Run(pruneCtx)
+
 	srv := &http.Server{
 		Addr:              cfg.QueryListenAddr,
 		Handler:           router,
@@ -70,6 +75,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	prunecancel()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

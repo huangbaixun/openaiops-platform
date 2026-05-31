@@ -25,6 +25,10 @@ type Config struct {
 	TopoTickInterval      time.Duration // default 1m
 	TopoCatchupMax        time.Duration // default 1h
 	TopoTenantConcurrency int           // default 4
+
+	// annotations idempotency-key pruner (PLATFORM-ANN-1 / D9)
+	AnnotationsRetentionDays int           // default 30 — null idempotency_key older than this
+	AnnotationsPruneInterval time.Duration // default 24h — how often cmd/query prunes
 }
 
 func FromEnv() (Config, error) {
@@ -75,6 +79,24 @@ func FromEnv() (Config, error) {
 		cfg.TopoTenantConcurrency = n
 	} else {
 		cfg.TopoTenantConcurrency = 4
+	}
+
+	cfg.AnnotationsRetentionDays = 30
+	if v := os.Getenv("ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return cfg, fmt.Errorf("config: ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS: %w", err)
+		}
+		cfg.AnnotationsRetentionDays = n
+	}
+
+	cfg.AnnotationsPruneInterval = 24 * time.Hour
+	if v := os.Getenv("ANNOTATIONS_PRUNE_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return cfg, fmt.Errorf("config: ANNOTATIONS_PRUNE_INTERVAL: %w", err)
+		}
+		cfg.AnnotationsPruneInterval = d
 	}
 
 	return cfg, nil

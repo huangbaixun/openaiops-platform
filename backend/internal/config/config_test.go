@@ -1,6 +1,12 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestFromEnv_LogIngesterDefaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
@@ -22,4 +28,24 @@ func TestFromEnv_LogIngesterDefaults(t *testing.T) {
 	if c.LogIngesterAdminAddr != "0.0.0.0:8083" {
 		t.Fatalf("admin default: got %q", c.LogIngesterAdminAddr)
 	}
+}
+
+func TestFromEnv_AnnotationDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS", "")
+	t.Setenv("ANNOTATIONS_PRUNE_INTERVAL", "")
+	cfg, err := FromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, 30, cfg.AnnotationsRetentionDays)
+	assert.Equal(t, 24*time.Hour, cfg.AnnotationsPruneInterval)
+}
+
+func TestFromEnv_AnnotationOverrides(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://x")
+	t.Setenv("ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS", "7")
+	t.Setenv("ANNOTATIONS_PRUNE_INTERVAL", "1h")
+	cfg, err := FromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, 7, cfg.AnnotationsRetentionDays)
+	assert.Equal(t, time.Hour, cfg.AnnotationsPruneInterval)
 }
