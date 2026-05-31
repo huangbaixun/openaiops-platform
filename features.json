@@ -460,7 +460,7 @@
       "priority": "P2",
       "status": "proposed",
       "spec": "docs/specs/2026-05-31-platform-ann-1-annotations-hardening-design.md",
-      "plan": null,
+      "plan": "docs/plans/2026-05-31-platform-ann-1-annotations-hardening-plan.md",
       "source": "Closes known_drift D8 (annotation badge e2e only on service-detail) + D9 (unbounded idempotency_key index). ASK-2 follow-up.",
       "description": "D8: extend frontend/e2e/annotations.spec.ts to assert the AI badge on trace-detail (seeded trace annotation) and the graph-node-ann-checkout marker on /topology (viable now D6 is fixed). D9: a background pruner goroutine in cmd/query nulls idempotency_key for annotations older than ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS (default 30; interval default 24h) so the partial unique index uq_annotations_idem stays bounded — annotation content preserved, dedupe lapses past the window. AnnotationsRepo.PruneIdempotencyKeys(ctx, days) is the maintenance method (intentionally tenant-unscoped retention; only clears keys). No schema change, no ADR.",
       "acceptance_criteria": [
