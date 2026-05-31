@@ -8,6 +8,8 @@ const client = axios.create({
 client.interceptors.request.use((cfg) => {
   const key = localStorage.getItem('apiKey')
   if (key) cfg.headers.Authorization = `Bearer ${key}`
+  const active = localStorage.getItem('activeTenantId')
+  if (active) cfg.headers['X-Tenant-Id'] = active
   return cfg
 })
 
