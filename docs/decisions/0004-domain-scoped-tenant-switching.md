@@ -1,6 +1,6 @@
 # ADR-0004: Domain-scoped multi-tenant switching
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-05-31
 - **Deciders**: @huangbaixun
 - **Tracks**: PLATFORM-MT-1

@@ -19,7 +19,7 @@
 - 本地若与 SignOz 等冲突走 `deploy/.env.local` 覆盖 `GATEWAY_HOST_PORT` / `QUERY_HOST_PORT` / `INGESTER_OTLP_GRPC_HOST_PORT` / `INGESTER_OTLP_HTTP_HOST_PORT` / `LOG_INGESTER_OTLP_GRPC_HOST_PORT` / `LOG_INGESTER_OTLP_HTTP_HOST_PORT` / `TOPO_ENGINE_ADMIN_HOST_PORT` / `FRONTEND_HOST_PORT`。CI 必须用默认。
 
 ### 二进制 + 路由划分（ADR-0003）
-- gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/healthz`、`/livez`。依赖 PG。
+- gateway (`cmd/gateway`, :8080)：写入面 + 行政面 — `/api/v1/admin*`、`/api/v1/metering*`、`/api/v1/tenants*`（身份/行政面：列出可见租户 + 切租户审计，PLATFORM-MT-1，ADR-0004）、`/healthz`、`/livez`。依赖 PG。
 - query (`cmd/query`, :8081)：CH 读路径 — `/api/v1/traces*`、`/api/v1/logs*`、`/api/v1/services*`、`/api/v1/topology*`；外加唯一写端点 `/api/v1/annotations*`（AI RCA 回写，PG 存储，PLATFORM-ASK-2，ADR-0003 amendment）。依赖 PG (auth + annotations) + CH (data)。
 - ingester (`cmd/ingester`, :4317/:4318/:8082)：OTLP trace receiver。
 - log-ingester (`cmd/log-ingester`, :4327/:4328/:8083)：OTLP log receiver（mirrors cmd/ingester for logs, SLICE-2 起）。
