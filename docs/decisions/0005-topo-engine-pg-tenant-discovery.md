@@ -1,6 +1,6 @@
 # ADR-0005: topo-engine PG-driven tenant discovery (retire AdminConn)
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-05-31
 - **Deciders**: @huangbaixun
 - **Tracks**: PLATFORM-TOPO-1 (fixes known_drift D6)
