@@ -77,6 +77,24 @@ func (r *AnnotationsRepo) Insert(ctx context.Context, tenantID uuid.UUID, in Ann
 	return id, false, nil
 }
 
+// PruneIdempotencyKeys nulls idempotency_key for annotations whose created_at is older
+// than `days` days, returning the number of rows affected. Maintenance op — intentionally
+// tenant-UNSCOPED (retention runs across all tenants); it only clears keys, never reads or
+// exposes annotation content. Nulling frees the row from the partial unique index
+// uq_annotations_idem (WHERE idempotency_key IS NOT NULL), bounding it. PLATFORM-ANN-1 / D9.
+func (r *AnnotationsRepo) PruneIdempotencyKeys(ctx context.Context, days int) (int64, error) {
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE annotations
+		   SET idempotency_key = NULL
+		 WHERE idempotency_key IS NOT NULL
+		   AND created_at < now() - make_interval(days => $1)
+	`, days)
+	if err != nil {
+		return 0, fmt.Errorf("annotations: prune idempotency keys: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 // List returns annotations for tenantID + targetType, optionally narrowed to a
 // single targetID, newest first.
 func (r *AnnotationsRepo) List(ctx context.Context, tenantID uuid.UUID, targetType, targetID string, limit int) ([]Annotation, error) {
