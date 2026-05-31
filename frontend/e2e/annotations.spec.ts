@@ -45,3 +45,36 @@ test('cross-tenant write is blocked (403)', async ({ request }) => {
   })
   expect(res.status()).toBe(403)
 })
+
+test('AI annotation badge appears on trace detail', async ({ page, request }) => {
+  const listRes = await request.get('/api/v1/traces?window=1h', {
+    headers: { Authorization: 'Bearer test-key-acme' },
+  })
+  expect(listRes.ok()).toBeTruthy()
+  const data = await listRes.json()
+  // TraceListResponse shape: { items: TraceListItem[], has_more: boolean }
+  const traceId = data.items?.[0]?.trace_id ?? data[0]?.trace_id
+  expect(traceId, 'a seeded trace must exist (run seed-traces)').toBeTruthy()
+
+  const res = await request.post('/api/v1/annotations', {
+    headers: { Authorization: 'Bearer test-key-acme', 'Content-Type': 'application/json' },
+    data: { target_type: 'trace', target_id: traceId, kind: 'ai_rca', payload: { summary: 'e2e trace' }, ts: new Date().toISOString() },
+  })
+  expect([200, 201]).toContain(res.status())
+
+  await loginAs(page, 'test-key-acme')
+  await page.goto(`/traces/${traceId}`)
+  await expect(page.getByTestId('annotation-badge')).toBeVisible({ timeout: 10_000 })
+})
+
+test('AI annotation marker appears on a topology node', async ({ page, request }) => {
+  const res = await request.post('/api/v1/annotations', {
+    headers: { Authorization: 'Bearer test-key-acme', 'Content-Type': 'application/json' },
+    data: { target_type: 'service', target_id: 'checkout', kind: 'ai_rca', payload: { summary: 'e2e topo' }, ts: new Date().toISOString() },
+  })
+  expect([200, 201]).toContain(res.status())
+
+  await loginAs(page, 'test-key-acme')
+  await page.goto('/topology?window=1h')
+  await expect(page.getByTestId('graph-node-ann-checkout')).toBeVisible({ timeout: 10_000 })
+})

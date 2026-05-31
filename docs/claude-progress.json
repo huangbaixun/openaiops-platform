@@ -104,14 +104,14 @@
     },
     {
       "date": "2026-05-29",
-      "item": "PLATFORM-ASK-2 e2e coverage gap: frontend/e2e/annotations.spec.ts asserts the badge only on the service-detail page + the cross-tenant 403. The spec's testing strategy promised badge coverage on trace-detail and topology-node too. Add a trace annotation seed + TraceDetail navigation assertion and a graph-node-ann-* testid assertion when re-running e2e post-docker.",
-      "severity": "low",
+      "item": "RESOLVED 2026-05-31 (PLATFORM-ANN-1): annotations.spec.ts now asserts the AI badge on trace-detail (seeded trace annotation) and the graph-node-ann-checkout marker on /topology. PLATFORM-ASK-2 e2e coverage gap: frontend/e2e/annotations.spec.ts asserts the badge only on the service-detail page + the cross-tenant 403. The spec's testing strategy promised badge coverage on trace-detail and topology-node too. Add a trace annotation seed + TraceDetail navigation assertion and a graph-node-ann-* testid assertion when re-running e2e post-docker.",
+      "severity": "resolved",
       "tracked_in": "D8"
     },
     {
       "date": "2026-05-29",
-      "item": "PLATFORM-ASK-2 idempotency index uq_annotations_idem (tenant_id, idempotency_key) is unbounded — keys retained forever (the '24h dedupe' is satisfied as a retention floor). Add a periodic prune of idempotency_key values older than ~30d before the table grows operationally burdensome. Out of scope for ASK-2 by design.",
-      "severity": "low",
+      "item": "RESOLVED 2026-05-31 (PLATFORM-ANN-1): cmd/query runs a background AnnotationsPruner that nulls idempotency_key older than ANNOTATIONS_IDEMPOTENCY_RETENTION_DAYS (default 30d) on boot + every 24h, bounding uq_annotations_idem; content preserved. PLATFORM-ASK-2 idempotency index uq_annotations_idem (tenant_id, idempotency_key) is unbounded — keys retained forever (the '24h dedupe' is satisfied as a retention floor). Add a periodic prune of idempotency_key values older than ~30d before the table grows operationally burdensome. Out of scope for ASK-2 by design.",
+      "severity": "resolved",
       "tracked_in": "D9"
     },
     {
