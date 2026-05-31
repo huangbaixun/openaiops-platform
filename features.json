@@ -429,12 +429,13 @@
       "id": "PLATFORM-TOPO-1",
       "name": "topo-engine PG-driven tenant discovery (fix D6)",
       "priority": "P2",
-      "status": "building",
+      "status": "done",
       "spec": "docs/specs/2026-05-31-platform-topo-1-pg-tenant-discovery-design.md",
       "plan": "docs/plans/2026-05-31-platform-topo-1-pg-tenant-discovery-plan.md",
       "adr": [
         "0005"
       ],
+      "evidence": "4 TDD tasks, subagent-driven (commits a454c8e..883a5f4, ff-merged to main). T1 lastCompletedBucket -> tenant-scoped Conn.QueryRow (also fixed a pre-existing build break: topoengine integration was uncompilable since ASK-2's query.NewRouter db-arg change). T2 activeTenants -> PG `SELECT id FROM tenants` via Deps.PG; new TestTopoEngine_Discovery_FromPG proves it (idle tenant -> no stats, trace tenant -> stats; Admin:nil wiring makes the old path nil-panic). T3 removed chquery.AdminConn + sentinel + admin_*.go (398 lines) + lint Rule 2; lint Rule 1 intact. Final holistic review READY_TO_MERGE: chquery core (conn.go/scope.go), Row Policy DDL (ch-migrations/), and deploy config (compose/xml) all ZERO-DIFF vs main — isolation strengthened (only Row-Policy-bypass removed, no new bypass). VERIFIED 2026-05-31 (T4, live stack): rebuilt topo-engine image, seeded, topo-engine populated service_stats in ~50s (checkout/payment/frontend) WITHOUT manual backfill; shell.spec ⌘K e2e 3/3 (the previously-red D6 test); full Playwright 34/34; backend unit + integration green. D6 CLOSED (known_drift severity -> resolved). No Row Policy / CH-user / deploy change.",
       "source": "Fixes known_drift D6 (topo-engine admin discovery blocked by Row Policy -> empty service_stats). Approach C (PG-driven) chosen by user 2026-05-31 over A (Row-Policy-exempt CH user).",
       "description": "topo-engine discovers tenants from the authoritative PG tenants table (via its already-open, unused Deps.PG) instead of the AdminConn sentinel path that the tenant_isolation_* Row Policy filters to 0 rows. lastCompletedBucket becomes a tenant-scoped CH query. chquery.AdminConn + sentinel + its lint exception are removed. Per-tenant aggregation (edges.go/services.go) is unchanged. No Row Policy DDL / CH user / deploy change. Strengthens isolation by removing the only Row-Policy-bypass mechanism. ADR-0005.",
       "acceptance_criteria": [
