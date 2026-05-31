@@ -50,10 +50,11 @@ func ClosedBucketAtNow() time.Time { return ClosedBucketAt(time.Now()) }
 // errgroup callbacks always return nil so g.Wait() never short-circuits
 // (and the inherited gctx is never cancelled by a sibling failure).
 //
-// adminCtx must carry NO tenant — discovery uses chquery.AdminConn. Each
-// per-tenant work unit derives its own tctx via auth.WithTenant.
+// adminCtx must carry NO tenant — discovery reads the PG tenants table
+// (PLATFORM-TOPO-1 / ADR-0005). Each per-tenant work unit derives its
+// own tctx via auth.WithTenant.
 func (e *Engine) RunBucket(adminCtx context.Context, bucket time.Time) error {
-	tenants, err := e.activeTenants(adminCtx, bucket)
+	tenants, err := e.activeTenants(adminCtx)
 	if err != nil {
 		return fmt.Errorf("topoengine: list tenants: %w", err)
 	}
@@ -87,15 +88,11 @@ func (e *Engine) RunBucket(adminCtx context.Context, bucket time.Time) error {
 // counted but do not stop the rest of the replay for the same tenant or
 // for sibling tenants.
 //
-// adminCtx must carry NO tenant. Tenant discovery uses chquery.AdminConn
-// (its sentinel custom_tenant_id requires an operator-managed CH user
-// exempted from the tenant_isolation Row Policy to actually see all
-// tenants in prod — tracked as a known drift). For test environments where
-// the CH user is policy-bound, see CatchupTenant for the per-tenant entry
-// point that bypasses discovery.
+// adminCtx must carry NO tenant. Tenant discovery reads the PG tenants
+// table (PLATFORM-TOPO-1 / ADR-0005). Per-tenant replay uses
+// CatchupTenant which derives its own auth context via auth.WithTenant.
 func (e *Engine) Catchup(adminCtx context.Context) error {
-	since := time.Now().UTC().Add(-e.cfg.CatchupMax)
-	tenants, err := e.activeTenants(adminCtx, since)
+	tenants, err := e.activeTenants(adminCtx)
 	if err != nil {
 		return fmt.Errorf("topoengine: catchup: list tenants: %w", err)
 	}

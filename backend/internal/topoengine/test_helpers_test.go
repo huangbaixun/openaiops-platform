@@ -89,6 +89,23 @@ func setupEngine(t *testing.T, cfg topoengine.Config) (*topoengine.Engine, *chqu
 	return eng, conn
 }
 
+// setupEngineWithPG wires an engine whose Deps.PG points at the shared ephemeral
+// Postgres, so activeTenants (PG-driven, PLATFORM-TOPO-1) can be exercised.
+func setupEngineWithPG(t *testing.T, cfg topoengine.Config, db *sql.DB) (*topoengine.Engine, *chquery.Conn) {
+	t.Helper()
+	conn := setupCH(t)
+	reg := prometheus.NewRegistry()
+	metrics := topoengine.NewMetrics(reg)
+	eng := topoengine.New(cfg, topoengine.Deps{CH: conn, PG: db}, metrics)
+	return eng, conn
+}
+
+func timeNowUTC() time.Time { return time.Now().UTC() }
+
+func authCtx(tid uuid.UUID) context.Context {
+	return auth.WithTenant(context.Background(), tid, "test")
+}
+
 // seedSpansForTenant inserts spans for the given tenant into traces_v1.
 // All spans share the same trace_id (derived from tenant prefix) and are
 // stamped at bucket+(i+1)*100ms so they all fall in [bucket, bucket+1min).

@@ -5,10 +5,9 @@
 // the bucket strictly before T's containing minute, so no in-flight
 // ingest writes can land in a bucket being aggregated.
 //
-// Tenant trust: discovery uses chquery.AdminConn (whitelisted SQL only).
-// Per-tenant aggregation uses chquery.Conn under auth.WithTenant(...),
-// which provides the three-layer tenant safety (SQL filter + Row Policy
-// + custom_tenant_id session setting).
+// Tenant trust: discovery reads the PG tenants table; per-tenant
+// aggregation uses chquery.Conn under auth.WithTenant(...) (SQL filter
+// + Row Policy + custom_tenant_id).
 package topoengine
 
 import (
@@ -41,7 +40,7 @@ func DefaultConfig() Config {
 type Deps struct {
 	CH    *chquery.Conn      // tenant-scoped CH access
 	Admin *chquery.AdminConn // tenant-unaware admin queries
-	PG    *sql.DB            // reserved for future idempotency state
+	PG    *sql.DB            // tenant discovery: SELECT id FROM tenants (PLATFORM-TOPO-1)
 }
 
 // Engine is the topo aggregation pipeline.
