@@ -310,7 +310,10 @@
         "scope='tenant:<X>' key + X-Tenant-Id header is ignored (tenant pinned to key)",
         "Regression: existing tenant-scoped keys continue working unchanged"
       ],
-      "out_of_scope": ["per-key rate limits (separate ask)", "key management UI"],
+      "out_of_scope": [
+        "per-key rate limits (separate ask)",
+        "key management UI"
+      ],
       "dependencies": [],
       "technical_notes": "Aligns with platform spec §3.3. Slice-1 blocker for openaiops-ai. Without it, AI falls back to N per-tenant keys."
     },
@@ -330,8 +333,13 @@
         "Cross-tenant write blocked (annotation tenant_id must match bearer scope or X-Tenant-Id header)",
         "Idempotency-Key header dedupes within 24h"
       ],
-      "out_of_scope": ["UI editing of annotations", "annotation comments/threads"],
-      "dependencies": ["PLATFORM-ASK-1"],
+      "out_of_scope": [
+        "UI editing of annotations",
+        "annotation comments/threads"
+      ],
+      "dependencies": [
+        "PLATFORM-ASK-1"
+      ],
       "technical_notes": "Used by openaiops-ai Slice 1 write-back. Spec §6 contract."
     },
     {
@@ -348,7 +356,10 @@
         "Delivery failures retried with exponential backoff; permanent failure surfaced in audit_log",
         "Regression: existing Slack/SMTP channels work unchanged"
       ],
-      "out_of_scope": ["AI receiving non-alert webhooks", "two-way ack from AI"],
+      "out_of_scope": [
+        "AI receiving non-alert webhooks",
+        "two-way ack from AI"
+      ],
       "dependencies": [],
       "technical_notes": "Lives within platform SLICE-4 scope; do not promote to its own slice."
     },
@@ -387,7 +398,9 @@
       "status": "done",
       "spec": "docs/specs/2026-05-31-platform-mt-1-domain-switching-design.md",
       "plan": "docs/plans/2026-05-31-platform-mt-1-domain-switching-plan.md",
-      "adr": ["0004"],
+      "adr": [
+        "0004"
+      ],
       "evidence": "7 TDD tasks, subagent-driven (commits c35bfab..bbcd38c, ff-merged to main). T1 migration (domains, tenants.domain_id/environment, audit_log). T2 tenant.Tenant DomainID/Environment + PGResolver. T3 middleware `domain` scope branch (in-domain X-Tenant-Id adopt / out-of-domain 403 / non-domain ignores) + ctx scope/keyid; final review confirmed 5 fail-closed security checks PASS (NULL-domain can't switch, Nil!=Nil, service:ai unchanged, read-write ignores header, non-TenantLookup->404). T4 GET /v1/tenants (domain peers/single, NULL-domain no over-disclosure via PG x=NULL semantics) + POST /v1/tenants/switch (validate + audit once, NOT per-request) on gateway. T5 frontend tenants api + auth store activeTenantId/switchActiveTenant + X-Tenant-Id interceptor. T6 ScopePill live switcher. T7 seed demo-domain + e2e. Two real bugs caught by e2e + fixed (routes /api/v1->/v1 for Caddy strip-prefix). Final holistic review READY_TO_MERGE: chquery data layer ZERO-DIFF (isolation mechanism untouched), invariant enforced redundantly at middleware (real gate) + /switch (audit pre-flight). VERIFIED 2026-05-31: backend unit+integration (auth/identity/query) green, 120 vitest, build clean, MT-1's 3 e2e green (in-domain switch / single read-only / out-of-domain 403), cross-tenant isolation e2e GREEN (A-writes/B-reads->0 preserved). CONCERN: 1 pre-existing e2e red — shell.spec ⌘K (a UI-1 test) fails on D6 (topo-engine admin activeTenants() blocked by Row Policy -> service_stats empty -> palette empty); MT-1 touched no CH/topo code; latently red on main too. User approved landing MT-1 + tracking D6 separately (see known_drift D6).",
       "source": "User request 2026-05-30: full multi-tenant switching behind the OpenAPM topbar scope selectors. Decomposed out of PLATFORM-UI-1 as the security-critical backend half. Identity substrate locked 2026-05-31: domain-scoped API keys (NOT human users/sessions).",
       "description": "Feature B. Add domain grouping + per-tenant environment tag (goose migration), and a new 'domain' api_keys scope that may switch among the tenants of its own domain via the existing X-Tenant-Id mechanism (generalized from service:ai, fail-closed on domain membership). New GET /api/v1/tenants enumerates the caller's visible tenants. Wires the PLATFORM-UI-1 scope-pill to real switching (same key + header, no re-login). Preserves the one-active-tenant-per-request isolation invariant (ADR-0001 §3.3) — MustTenantScope + Row Policy unchanged. No human-user/password/session system (ADR-0004).",
@@ -400,18 +413,28 @@
         "ADR-0004 written documenting the auth-model change; each switch writes an audit_log row",
         "All existing tests stay green; new unit/integration/e2e pass"
       ],
-      "out_of_scope": ["Human users/passwords/SSO/sessions/JWT", "domain & membership management UI (seed/migration-managed)", "cross-domain switching; environment-based access control", "per-service ACL; team/squad aggregation tier"],
-      "dependencies": ["PLATFORM-UI-1", "PLATFORM-ASK-1"],
+      "out_of_scope": [
+        "Human users/passwords/SSO/sessions/JWT",
+        "domain & membership management UI (seed/migration-managed)",
+        "cross-domain switching; environment-based access control",
+        "per-service ACL; team/squad aggregation tier"
+      ],
+      "dependencies": [
+        "PLATFORM-UI-1",
+        "PLATFORM-ASK-1"
+      ],
       "technical_notes": "Security-critical: changes who can see which tenant (CLAUDE.md day-1 load-bearing invariant). Identity substrate = domain-scoped API keys (light), not human users. Generalizes ASK-1's X-Tenant-Id from service:ai to 'domain' scope, validated by shared non-NULL domain_id. ADR-0004 + spec authored 2026-05-31. Switch is auth-time only; data layer (MustTenantScope/Row Policy) untouched."
     },
     {
       "id": "PLATFORM-TOPO-1",
       "name": "topo-engine PG-driven tenant discovery (fix D6)",
       "priority": "P2",
-      "status": "proposed",
+      "status": "building",
       "spec": "docs/specs/2026-05-31-platform-topo-1-pg-tenant-discovery-design.md",
       "plan": "docs/plans/2026-05-31-platform-topo-1-pg-tenant-discovery-plan.md",
-      "adr": ["0005"],
+      "adr": [
+        "0005"
+      ],
       "source": "Fixes known_drift D6 (topo-engine admin discovery blocked by Row Policy -> empty service_stats). Approach C (PG-driven) chosen by user 2026-05-31 over A (Row-Policy-exempt CH user).",
       "description": "topo-engine discovers tenants from the authoritative PG tenants table (via its already-open, unused Deps.PG) instead of the AdminConn sentinel path that the tenant_isolation_* Row Policy filters to 0 rows. lastCompletedBucket becomes a tenant-scoped CH query. chquery.AdminConn + sentinel + its lint exception are removed. Per-tenant aggregation (edges.go/services.go) is unchanged. No Row Policy DDL / CH user / deploy change. Strengthens isolation by removing the only Row-Policy-bypass mechanism. ADR-0005.",
       "acceptance_criteria": [
@@ -422,7 +445,11 @@
         "shell.spec ⌘K e2e passes; full Playwright suite green; known_drift D6 closed",
         "No Row Policy DDL / CH user / deploy-config change; ADR-0005 documents the decision"
       ],
-      "out_of_scope": ["Row-Policy-exempt CH user (Option A, rejected)", "idle-tenant aggregation optimization", "aggregation SQL changes"],
+      "out_of_scope": [
+        "Row-Policy-exempt CH user (Option A, rejected)",
+        "idle-tenant aggregation optimization",
+        "aggregation SQL changes"
+      ],
       "dependencies": [],
       "technical_notes": "topo-engine already opens PG (cmd/topo-engine/main.go:55, Deps.PG) but never uses it. Both broken admin queries (activeTenants via AdminListTenants, lastCompletedBucket via AdminMaxBucket) move off AdminConn. Test CH user has ACCESS_MANAGEMENT=1 which masks the Row Policy, so the real D6 proof is the live ⌘K e2e on the dev stack. Fixes the issue that bit UI-1 + MT-1 e2e."
     }
