@@ -23,7 +23,8 @@ func NewPGResolver(db *sql.DB) *PGResolver { return &PGResolver{db: db} }
 func (p *PGResolver) ResolveBearer(ctx context.Context, plain string) (apikey.ApiKey, tenant.Tenant, error) {
 	query := `
 		SELECT k.id, k.tenant_id, k.name, k.hashed_key, k.scope, k.revoked_at, k.last_used_at, k.created_at,
-		       t.id, t.name, t.plan, t.rate_limit_per_min, t.data_retention_days, t.created_at
+		       t.id, t.name, t.plan, t.rate_limit_per_min, t.data_retention_days, t.created_at,
+		       t.domain_id, t.environment
 		FROM api_keys k JOIN tenants t ON t.id = k.tenant_id
 		WHERE k.revoked_at IS NULL
 	`
@@ -36,13 +37,20 @@ func (p *PGResolver) ResolveBearer(ctx context.Context, plain string) (apikey.Ap
 	for rows.Next() {
 		var k apikey.ApiKey
 		var t tenant.Tenant
+		var dn uuid.NullUUID
+		var env sql.NullString
 		if err := rows.Scan(
 			&k.ID, &k.TenantID, &k.Name, &k.HashedKey, &k.Scope,
 			&k.RevokedAt, &k.LastUsedAt, &k.CreatedAt,
 			&t.ID, &t.Name, &t.Plan, &t.RateLimitPerMin, &t.DataRetentionDays, &t.CreatedAt,
+			&dn, &env,
 		); err != nil {
 			return apikey.ApiKey{}, tenant.Tenant{}, err
 		}
+		if dn.Valid {
+			t.DomainID = dn.UUID
+		}
+		t.Environment = env.String
 		if apikey.Verify(plain, k.HashedKey) {
 			return k, t, nil
 		}
@@ -55,13 +63,15 @@ func (p *PGResolver) ResolveBearer(ctx context.Context, plain string) (apikey.Ap
 // Returns ErrTenantNotFound when the id is unknown.
 func (p *PGResolver) TenantByID(ctx context.Context, id uuid.UUID) (tenant.Tenant, error) {
 	query := `
-		SELECT id, name, plan, rate_limit_per_min, data_retention_days, created_at
+		SELECT id, name, plan, rate_limit_per_min, data_retention_days, created_at, domain_id, environment
 		FROM tenants
 		WHERE id = $1
 	`
 	var t tenant.Tenant
+	var dn uuid.NullUUID
+	var env sql.NullString
 	err := p.db.QueryRowContext(ctx, query, id).Scan(
-		&t.ID, &t.Name, &t.Plan, &t.RateLimitPerMin, &t.DataRetentionDays, &t.CreatedAt,
+		&t.ID, &t.Name, &t.Plan, &t.RateLimitPerMin, &t.DataRetentionDays, &t.CreatedAt, &dn, &env,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Tenant{}, ErrTenantNotFound
@@ -69,5 +79,9 @@ func (p *PGResolver) TenantByID(ctx context.Context, id uuid.UUID) (tenant.Tenan
 	if err != nil {
 		return tenant.Tenant{}, err
 	}
+	if dn.Valid {
+		t.DomainID = dn.UUID
+	}
+	t.Environment = env.String
 	return t, nil
 }

@@ -100,6 +100,20 @@ func TestPGResolver_TenantByID(t *testing.T) {
 	assert.Equal(t, "acme", got.Name)
 	assert.Equal(t, id, got.ID)
 
+	var domID string
+	require.NoError(t, db.QueryRowContext(ctx, "INSERT INTO domains(name) VALUES('acme-corp') RETURNING id").Scan(&domID))
+	var dtID string
+	require.NoError(t, db.QueryRowContext(ctx,
+		"INSERT INTO tenants(name, domain_id, environment) VALUES('shop-prod',$1,'prod') RETURNING id", domID).Scan(&dtID))
+
+	did, err := uuid.Parse(dtID)
+	require.NoError(t, err)
+	got2, err := r.TenantByID(ctx, did)
+	require.NoError(t, err)
+	assert.Equal(t, "shop-prod", got2.Name)
+	assert.Equal(t, "prod", got2.Environment)
+	assert.Equal(t, domID, got2.DomainID.String())
+
 	_, err = r.TenantByID(ctx, uuid.New()) // valid uuid, absent row
 	assert.ErrorIs(t, err, auth.ErrTenantNotFound)
 }
