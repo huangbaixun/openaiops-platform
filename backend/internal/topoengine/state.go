@@ -6,30 +6,23 @@ import (
 	"io"
 	"log/slog"
 	"time"
-
-	"github.com/huangbaixun/openaiops-platform/backend/internal/auth"
-	"github.com/huangbaixun/openaiops-platform/backend/internal/chquery"
 )
 
 // lastCompletedBucket returns max(ts_bucket) in topology_edges_v1 for the
 // tenant in ctx, or zero time if none. Used by Catchup to decide replay start.
-// Reads via chquery.AdminConn (AdminMaxBucket whitelist) with tenant_id bound
-// as a SQL arg — no need for chquery.Conn here.
+// Runs as a tenant-scoped chquery.Conn query (PLATFORM-TOPO-1 / ADR-0005) — the
+// `tenant_id = ?` placeholder + custom_tenant_id are injected by MustTenantScope,
+// so the tenant_isolation Row Policy passes for the real tenant.
 func (e *Engine) lastCompletedBucket(ctx context.Context) time.Time {
-	tid, err := auth.TenantID(ctx)
-	if err != nil {
-		panic("topoengine: lastCompletedBucket called without tenant in ctx: " + err.Error())
-	}
-	row := e.deps.Admin.AdminQueryRow(ctx, chquery.AdminMaxBucket, tid.String())
+	row := e.deps.CH.QueryRow(ctx,
+		`SELECT max(ts_bucket) FROM topology_edges_v1 FINAL WHERE tenant_id = ?`)
 	var t time.Time
 	if err := row.Scan(&t); err != nil {
-		// io.EOF / empty result = "no buckets yet, first boot" (legitimate zero).
-		// Other errors (driver / network) ALSO collapse to zero here for best-effort
-		// catchup behavior; the caller treats zero as "replay from now - CatchupMax".
-		// Real CH outages will surface via topo_engine_tick_failed_total at the tick layer.
+		// io.EOF / empty = "no buckets yet" (legitimate zero). Other errors also
+		// collapse to zero for best-effort catchup; real CH outages surface via
+		// the tick-failure metric at the tick layer.
 		if !errors.Is(err, io.EOF) {
-			slog.Warn("topoengine: lastCompletedBucket scan error (treating as zero)",
-				"err", err)
+			slog.Warn("topoengine: lastCompletedBucket scan error (treating as zero)", "err", err)
 		}
 		return time.Time{}
 	}

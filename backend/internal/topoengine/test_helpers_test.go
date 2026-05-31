@@ -284,7 +284,7 @@ func seedAPIKey(t *testing.T, db *sql.DB, tenantID uuid.UUID, tenantName, plaint
 func startQueryServer(t *testing.T, db *sql.DB, ch *chquery.Conn) *httptest.Server {
 	t.Helper()
 	resolver := auth.NewPGResolver(db)
-	r := query.NewRouter(resolver, ch)
+	r := query.NewRouter(resolver, ch, db)
 	return httptest.NewServer(r)
 }
 
