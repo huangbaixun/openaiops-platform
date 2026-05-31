@@ -37,7 +37,7 @@ func TenantName(ctx context.Context) string {
 	return name
 }
 
-// WithScope stores the resolved api key's scope so identity handlers (GET /api/v1/tenants)
+// WithScope stores the resolved api key's scope so identity handlers (GET /v1/tenants)
 // can decide what the caller may enumerate.
 func WithScope(ctx context.Context, scope string) context.Context {
 	return context.WithValue(ctx, scopeKey, scope)

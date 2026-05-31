@@ -21,8 +21,8 @@ func NewRouter(resolver auth.Resolver, db *sql.DB) *chi.Mux {
 	ih := identity.NewHandler(identity.NewRepo(db))
 	r.Group(func(g chi.Router) {
 		g.Use(auth.Middleware(resolver))
-		g.Get("/api/v1/tenants", ih.List)
-		g.Post("/api/v1/tenants/switch", ih.Switch)
+		g.Get("/v1/tenants", ih.List)
+		g.Post("/v1/tenants/switch", ih.Switch)
 	})
 
 	// Auth-free liveness for docker-compose healthcheck.
