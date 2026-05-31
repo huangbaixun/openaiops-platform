@@ -403,6 +403,28 @@
       "out_of_scope": ["Human users/passwords/SSO/sessions/JWT", "domain & membership management UI (seed/migration-managed)", "cross-domain switching; environment-based access control", "per-service ACL; team/squad aggregation tier"],
       "dependencies": ["PLATFORM-UI-1", "PLATFORM-ASK-1"],
       "technical_notes": "Security-critical: changes who can see which tenant (CLAUDE.md day-1 load-bearing invariant). Identity substrate = domain-scoped API keys (light), not human users. Generalizes ASK-1's X-Tenant-Id from service:ai to 'domain' scope, validated by shared non-NULL domain_id. ADR-0004 + spec authored 2026-05-31. Switch is auth-time only; data layer (MustTenantScope/Row Policy) untouched."
+    },
+    {
+      "id": "PLATFORM-TOPO-1",
+      "name": "topo-engine PG-driven tenant discovery (fix D6)",
+      "priority": "P2",
+      "status": "proposed",
+      "spec": "docs/specs/2026-05-31-platform-topo-1-pg-tenant-discovery-design.md",
+      "plan": null,
+      "adr": ["0005"],
+      "source": "Fixes known_drift D6 (topo-engine admin discovery blocked by Row Policy -> empty service_stats). Approach C (PG-driven) chosen by user 2026-05-31 over A (Row-Policy-exempt CH user).",
+      "description": "topo-engine discovers tenants from the authoritative PG tenants table (via its already-open, unused Deps.PG) instead of the AdminConn sentinel path that the tenant_isolation_* Row Policy filters to 0 rows. lastCompletedBucket becomes a tenant-scoped CH query. chquery.AdminConn + sentinel + its lint exception are removed. Per-tenant aggregation (edges.go/services.go) is unchanged. No Row Policy DDL / CH user / deploy change. Strengthens isolation by removing the only Row-Policy-bypass mechanism. ADR-0005.",
+      "acceptance_criteria": [
+        "activeTenants sources the tenant list from PG (tenants table) via Deps.PG; AdminConn-based discovery is gone",
+        "lastCompletedBucket is a tenant-scoped CH query (passes Row Policy, returns the real max bucket)",
+        "chquery.AdminConn + sentinel + lint exception removed; topo-engine builds; make lint-ch passes",
+        "On a fresh stack (policy enforced for openaiops), after seed + one tick, service_stats_v1/topology_edges_v1 populate and GET /api/v1/services returns data",
+        "shell.spec ⌘K e2e passes; full Playwright suite green; known_drift D6 closed",
+        "No Row Policy DDL / CH user / deploy-config change; ADR-0005 documents the decision"
+      ],
+      "out_of_scope": ["Row-Policy-exempt CH user (Option A, rejected)", "idle-tenant aggregation optimization", "aggregation SQL changes"],
+      "dependencies": [],
+      "technical_notes": "topo-engine already opens PG (cmd/topo-engine/main.go:55, Deps.PG) but never uses it. Both broken admin queries (activeTenants via AdminListTenants, lastCompletedBucket via AdminMaxBucket) move off AdminConn. Test CH user has ACCESS_MANAGEMENT=1 which masks the Row Policy, so the real D6 proof is the live ⌘K e2e on the dev stack. Fixes the issue that bit UI-1 + MT-1 e2e."
     }
   ]
 }
