@@ -104,7 +104,13 @@ A new `auth` helper exposes the membership check as a small, testable unit:
 `domain_id`). The `tenant.Tenant` struct gains a `DomainID uuid.UUID` (nullable → use
 `uuid.Nil` for NULL) and `Environment string` field; `PGResolver` queries select them.
 
-## New endpoint: `GET /api/v1/tenants` (gateway :8080, admin/identity plane)
+## New endpoints (gateway :8080, admin/identity plane)
+
+Both live on gateway per ADR-0003 (identity/admin plane, PG-backed). **No Caddy change**:
+`/api/v1/tenants*` is not in the query-prefix allowlist, so it falls through Caddy's
+catch-all to gateway:8080.
+
+### `GET /api/v1/tenants` — enumerate visible tenants
 
 Returns the caller's **visible** tenant set for populating the topbar selectors:
 
@@ -114,12 +120,25 @@ Returns the caller's **visible** tenant set for populating the topbar selectors:
   caller's own single tenant (selector renders read-only single item — exactly the
   PLATFORM-UI-1 forward-compatible behavior).
 
-Lives on gateway per ADR-0003 (identity/admin plane, PG-backed). **No Caddy change**:
-`/api/v1/tenants` is not in the query-prefix allowlist, so it falls through Caddy's
-catch-all to gateway:8080. The handler reads `auth.TenantID(ctx)` (the key's *own*
-tenant — switching does not affect which domain you can enumerate) + the key scope,
+The handler reads `auth.TenantID(ctx)` (the key's *own* tenant — enumeration is always
+relative to the key's home domain, independent of any active switch) + the key scope,
 looks up the domain peers, and returns them. PG queries are explicit-tenant/domain
 scoped (no bare SQL).
+
+### `POST /api/v1/tenants/switch` — record a switch (audit point)
+
+Body `{ "tenant_id": "<uuid>" }`. Validates that the caller's key may switch to the
+target (same `domain` membership rule as the middleware), writes **one** `audit_log`
+row (actor key id, from-tenant, to-tenant, ts), and returns `200 {tenant_id, name,
+environment}`. Out-of-domain / non-`domain`-key → **403**; unknown → 404; malformed → 400.
+
+This is the **single audit point**: the frontend calls it once when the user picks a
+tenant, then sets the active tenant locally. The per-request middleware (below) keeps
+enforcing isolation on every request via `X-Tenant-Id` but writes **no** audit — auditing
+per request would burn a row on every page refresh (the same anti-pattern CLAUDE.md
+forbids for `metering_events`). Calling `/switch` is advisory for audit + pre-flight UX
+validation; security does **not** depend on it (a caller skipping it still cannot reach
+an out-of-domain tenant, because the middleware re-validates every request).
 
 ## Frontend wiring (activate the UI-1 scope-pill)
 
@@ -139,12 +158,16 @@ scoped (no bare SQL).
 
 ## Data flow (a switch, end to end)
 
-1. User picks tenant **B** in the ScopePill → store sets `activeTenantId = B`.
-2. Interceptor adds `X-Tenant-Id: B` to every request (Bearer key unchanged).
-3. Gateway/query middleware: scope is `domain` → validate `B.domain_id == keyTenant.domain_id`
-   → adopt B → `WithTenant(ctx, B, …)`.
-4. `MustTenantScope` + Row Policy scope all CH/PG reads to B. One active tenant, as always.
-5. A `domain` key trying `X-Tenant-Id: C` where C ∉ its domain → **403**, no data leak.
+1. User picks tenant **B** in the ScopePill → frontend `POST /api/v1/tenants/switch {B}`.
+2. Backend validates `B.domain_id == keyTenant.domain_id`, writes one audit_log row, 200.
+   (Out-of-domain → 403; frontend keeps the old selection + toasts.)
+3. On 200, store sets `activeTenantId = B`; interceptor adds `X-Tenant-Id: B` to every
+   subsequent request (Bearer key unchanged).
+4. Per-request middleware: scope `domain` → re-validate `B.domain_id == keyTenant.domain_id`
+   → adopt B → `WithTenant(ctx, B, …)`. `MustTenantScope` + Row Policy scope all CH/PG
+   reads to B. One active tenant, as always — and isolation holds even if `/switch` was
+   skipped (the middleware is the real gate; `/switch` is audit + UX pre-flight).
+5. A `domain` key sending `X-Tenant-Id: C` where C ∉ its domain → **403**, no data leak.
 
 ## Error handling
 
@@ -162,9 +185,10 @@ scoped (no bare SQL).
   ADR-0001 §3.3.
 - Fail-closed at every branch; domain membership requires a **non-NULL shared** domain_id
   (two NULL-domain tenants are NOT "in the same domain").
-- **Audit**: each successful tenant switch (a `domain` key adopting a target ≠ its own)
-  writes an `audit_log` row (actor key id, from-tenant, to-tenant, ts). (ADR-0001 plans
-  this table; create it here if absent, scoped by tenant_id.)
+- **Audit**: written by the `POST /api/v1/tenants/switch` handler — **one row per switch
+  action**, NOT per request (per-request audit would burn a row on every page refresh, the
+  metering anti-pattern). Row = actor key id, from-tenant, to-tenant, ts. The `audit_log`
+  table is created by this feature's migration (absent today), scoped by tenant_id.
 - `service:ai` semantics are untouched (still any-tenant) — MT-1 only adds the `domain`
   branch.
 
@@ -191,7 +215,8 @@ scoped (no bare SQL).
    out-of-domain target → 403; absent header → own tenant; `read-write`/`service:ai`
    behavior unchanged.
 3. `GET /api/v1/tenants` returns the caller's domain peers (domain key) or its single
-   tenant (other), each with `{id, name, environment}`.
+   tenant (other), each with `{id, name, environment}`; `POST /api/v1/tenants/switch`
+   validates membership, writes one audit_log row, returns 200 (in-domain) / 403 (out).
 4. The PLATFORM-UI-1 ScopePill is wired: Project dropdown switches the active tenant
    (no re-login), Env shows/groups by environment; pages re-query under the new tenant.
 5. Isolation invariant preserved: reverse E2E (in-domain switch sees only target;
