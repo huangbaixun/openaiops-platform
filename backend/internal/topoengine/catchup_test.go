@@ -20,11 +20,7 @@ import (
 // CatchupTenant call must be a no-op for those seeded buckets (idempotent
 // via FINAL dedup on the ReplacingMergeTree) — verifies replay safety.
 //
-// NB: This test calls CatchupTenant (per-tenant entry point) rather than
-// Catchup (discovery + iterate) because the chtest fixture's openaiops user
-// is bound by the tenant_isolation Row Policy, which AdminConn's empty
-// sentinel custom_tenant_id cannot bypass. The discovery path is a known
-// operator concern (see chquery/admin.go).
+// Uses CatchupTenant (per-tenant entry point) directly — no PG fixture needed for this single-tenant backfill assertion.
 func TestTopoEngine_CatchupTenant_BackfillsThreeBuckets(t *testing.T) {
 	eng, conn := setupEngine(t, topoengine.DefaultConfig())
 	defer conn.Close()

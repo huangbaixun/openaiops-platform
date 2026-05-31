@@ -105,8 +105,8 @@ func (e *Engine) Catchup(adminCtx context.Context) error {
 }
 
 // CatchupTenant replays the missing-bucket window for ONE tenant. Exposed
-// so callers (and integration tests) can skip the AdminConn-based tenant
-// discovery path that the prod operator must enable separately.
+// so callers (and integration tests) can drive per-tenant backfill directly
+// without going through PG-based tenant discovery.
 //
 // adminCtx must carry NO tenant; CatchupTenant derives the per-tenant ctx
 // via auth.WithTenant. Per-bucket failures are logged + counted but never

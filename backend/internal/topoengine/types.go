@@ -38,9 +38,8 @@ func DefaultConfig() Config {
 
 // Deps is the set of long-lived clients the engine holds.
 type Deps struct {
-	CH    *chquery.Conn      // tenant-scoped CH access
-	Admin *chquery.AdminConn // tenant-unaware admin queries
-	PG    *sql.DB            // tenant discovery: SELECT id FROM tenants (PLATFORM-TOPO-1)
+	CH *chquery.Conn // tenant-scoped CH access
+	PG *sql.DB       // tenant discovery: SELECT id FROM tenants (PLATFORM-TOPO-1)
 }
 
 // Engine is the topo aggregation pipeline.

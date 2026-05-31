@@ -77,15 +77,13 @@ func setupCH(t *testing.T) *chquery.Conn {
 }
 
 // setupEngine wires a topoengine.Engine on top of the shared CH fixture.
-// PG is nil — Pass A / Pass B don't need it. Future tests that exercise
-// idempotency state will pass a *sql.DB via Deps.PG.
+// PG is nil — Pass A / Pass B don't need it (they call RunOnce, not Catchup).
 func setupEngine(t *testing.T, cfg topoengine.Config) (*topoengine.Engine, *chquery.Conn) {
 	t.Helper()
 	conn := setupCH(t)
-	admin := chquery.NewAdminConn(conn)
 	reg := prometheus.NewRegistry()
 	metrics := topoengine.NewMetrics(reg)
-	eng := topoengine.New(cfg, topoengine.Deps{CH: conn, Admin: admin, PG: nil}, metrics)
+	eng := topoengine.New(cfg, topoengine.Deps{CH: conn, PG: nil}, metrics)
 	return eng, conn
 }
 

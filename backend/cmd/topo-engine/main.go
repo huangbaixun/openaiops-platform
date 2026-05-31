@@ -1,15 +1,7 @@
 // topo-engine is the SLICE-3 background aggregator binary. Every TickInterval
-// it discovers active tenants via the admin connection and aggregates the
+// it discovers active tenants via the PG tenants table and aggregates the
 // previous closed bucket into topology_edges_v1 + service_stats_v1 using a
 // tenant-scoped chquery.Conn.
-//
-// Operator note (T2 known_drift): activeTenants() runs under AdminConn with
-// custom_tenant_id="" sentinel. Production deployments MUST grant the
-// topo-engine CH user exemption from tenant_isolation_* Row Policies, or
-// active tenant discovery returns 0 rows and Catchup is a silent no-op.
-// In docker-compose dev the `openaiops` CH user has ACCESS MANAGEMENT
-// (CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1) which bypasses Row Policy — so
-// it works there. See backend/internal/chquery/admin.go godoc.
 package main
 
 import (
@@ -67,20 +59,19 @@ func run(logger *slog.Logger) error {
 	}
 	defer ch.Close()
 
-	admin := chquery.NewAdminConn(ch)
-
 	// Dedicated registry so topo-engine /metrics only exposes its own series
 	// (rather than the process-default Go runtime metrics colliding with
 	// other binaries reusing the shared image).
 	reg := prometheus.NewRegistry()
 	metrics := topoengine.NewMetrics(reg)
+	// Tenant discovery reads the PG tenants table (ADR-0005); no Row-Policy-exempt CH user needed.
 	eng := topoengine.New(
 		topoengine.Config{
 			TickInterval:      cfg.TopoTickInterval,
 			CatchupMax:        cfg.TopoCatchupMax,
 			TenantConcurrency: cfg.TopoTenantConcurrency,
 		},
-		topoengine.Deps{CH: ch, Admin: admin, PG: db},
+		topoengine.Deps{CH: ch, PG: db},
 		metrics,
 	)
 
@@ -122,9 +113,7 @@ func run(logger *slog.Logger) error {
 	}()
 
 	// Catchup runs once on boot, then ready flips and the periodic tick
-	// loop takes over. See the operator note at the top of this file —
-	// under Row Policy without admin-bypassed CH user, activeTenants is
-	// empty and Catchup is a no-op.
+	// loop takes over.
 	go func() {
 		if err := eng.Catchup(rootCtx); err != nil {
 			logger.Error("topo-engine catchup", "err", err)

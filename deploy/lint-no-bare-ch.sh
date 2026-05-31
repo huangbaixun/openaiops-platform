@@ -32,26 +32,4 @@ if [ "$violations" -gt 0 ]; then
     exit 1
 fi
 
-# Rule 2: chquery.AdminConn may only be constructed under the topo-engine
-# subsystem — the internal/topoengine/ package and its cmd/topo-engine/ binary
-# (the only subsystem authorized to bypass MustTenantScope). _test.go files are
-# allowed anywhere — they exercise the AdminConn surface itself.
-# See SLICE-3 spec §2 (Tenant trust — topo-engine is an internal service).
-BAD_ADMIN=$(grep -rn "chquery\.NewAdminConn\b" "${ROOT}/" --include="*.go" 2>/dev/null \
-    | grep -v "_test\.go:" \
-    | grep -v "^${ROOT}/internal/chquery/" \
-    | grep -v "^${ROOT}/internal/topoengine/" \
-    | grep -v "^${ROOT}/cmd/topo-engine/" \
-    || true)
-
-if [ -n "$BAD_ADMIN" ]; then
-    echo "FAIL: chquery.NewAdminConn constructed outside internal/topoengine/ or cmd/topo-engine/:" >&2
-    echo "$BAD_ADMIN" >&2
-    echo "" >&2
-    echo "Violation: AdminConn bypasses MustTenantScope. Only the topo-engine" >&2
-    echo "subsystem (internal/topoengine/ or cmd/topo-engine/) may construct it." >&2
-    echo "See SLICE-3 spec §2." >&2
-    exit 1
-fi
-
-echo "lint-no-bare-ch: OK ($SCAN_DIRS clean; AdminConn confined to topo-engine subsystem)"
+echo "lint-no-bare-ch: OK ($SCAN_DIRS clean)"
