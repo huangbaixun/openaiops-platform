@@ -51,7 +51,7 @@ func TestPGResolver_TwoTenants_NoCrossTalk(t *testing.T) {
 	ctx := context.Background()
 	db, _ := sql.Open("pgx", pgDSN)
 	defer db.Close()
-	_, err := db.ExecContext(ctx, "TRUNCATE api_keys, tenants RESTART IDENTITY CASCADE")
+	_, err := db.ExecContext(ctx, "TRUNCATE domains, api_keys, tenants RESTART IDENTITY CASCADE")
 	require.NoError(t, err)
 
 	var t1ID, t2ID string
@@ -84,7 +84,7 @@ func TestPGResolver_TenantByID(t *testing.T) {
 	ctx := context.Background()
 	db, _ := sql.Open("pgx", pgDSN)
 	defer db.Close()
-	_, err := db.ExecContext(ctx, "TRUNCATE api_keys, tenants RESTART IDENTITY CASCADE")
+	_, err := db.ExecContext(ctx, "TRUNCATE domains, api_keys, tenants RESTART IDENTITY CASCADE")
 	require.NoError(t, err)
 
 	var tID string
