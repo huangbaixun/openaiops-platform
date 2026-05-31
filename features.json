@@ -382,22 +382,25 @@
     },
     {
       "id": "PLATFORM-MT-1",
-      "name": "Multi-tenant access model (domain/env/tenant switching)",
+      "name": "Domain-scoped multi-tenant switching",
       "priority": "P2",
       "status": "proposed",
-      "spec": null,
-      "source": "User request 2026-05-30: full multi-tenant switching behind the OpenAPM topbar scope selectors. Decomposed out of PLATFORM-UI-1 as the security-critical backend half.",
-      "description": "Feature B. Change the auth model from 'one API key -> one tenant' to 'one user -> many tenants': add domain grouping + environment tagging to tenants (goose migration), user<->multi-tenant ACL, tenant-switch with re-auth + Row Policy re-scoping. Wires the forward-compatible scope-pill selectors built in PLATFORM-UI-1 to real switching. Requires its own ADR (auth-model change touching the day-1 multi-tenant isolation invariant).",
+      "spec": "docs/specs/2026-05-31-platform-mt-1-domain-switching-design.md",
+      "adr": ["0004"],
+      "source": "User request 2026-05-30: full multi-tenant switching behind the OpenAPM topbar scope selectors. Decomposed out of PLATFORM-UI-1 as the security-critical backend half. Identity substrate locked 2026-05-31: domain-scoped API keys (NOT human users/sessions).",
+      "description": "Feature B. Add domain grouping + per-tenant environment tag (goose migration), and a new 'domain' api_keys scope that may switch among the tenants of its own domain via the existing X-Tenant-Id mechanism (generalized from service:ai, fail-closed on domain membership). New GET /api/v1/tenants enumerates the caller's visible tenants. Wires the PLATFORM-UI-1 scope-pill to real switching (same key + header, no re-login). Preserves the one-active-tenant-per-request isolation invariant (ADR-0001 §3.3) — MustTenantScope + Row Policy unchanged. No human-user/password/session system (ADR-0004).",
       "acceptance_criteria": [
-        "tenants table gains domain + environment metadata (goose Up/Down migration)",
-        "A user can list and switch among tenants they are authorized for; switching re-scopes all queries (CH Row Policy + PG)",
-        "Cross-tenant isolation invariant preserved end-to-end (A-writes/B-reads => 0) across a switch",
-        "ADR documents the auth-model change from key-pinned to user-multi-tenant",
-        "PLATFORM-UI-1 scope-pill selectors wired to real domain/env/tenant switching"
+        "domains table + tenants.domain_id + tenants.environment migrated (goose up/down); existing tenants survive with NULL domain_id",
+        "A 'domain'-scoped key switches among tenants of its own domain via X-Tenant-Id; out-of-domain target -> 403; absent header -> own tenant; read-write/service:ai behavior unchanged",
+        "GET /api/v1/tenants returns the caller's domain peers (domain key) or its single tenant (other), each {id,name,environment}",
+        "PLATFORM-UI-1 ScopePill wired: Project dropdown switches active tenant (no re-login), Env shows/groups by environment, pages re-query under new tenant",
+        "Isolation invariant preserved: reverse E2E (in-domain switch sees only target; out-of-domain blocked; A-writes/B-reads => 0) green in CI",
+        "ADR-0004 written documenting the auth-model change; each switch writes an audit_log row",
+        "All existing tests stay green; new unit/integration/e2e pass"
       ],
-      "out_of_scope": ["Per-service ACL (separate ask)", "team/squad aggregation tier"],
-      "dependencies": ["PLATFORM-UI-1"],
-      "technical_notes": "Security-critical: changes who can see which tenant (CLAUDE.md day-1 load-bearing invariant). Must have its own spec + ADR before implementation. Do NOT fold into the UI refactor."
+      "out_of_scope": ["Human users/passwords/SSO/sessions/JWT", "domain & membership management UI (seed/migration-managed)", "cross-domain switching; environment-based access control", "per-service ACL; team/squad aggregation tier"],
+      "dependencies": ["PLATFORM-UI-1", "PLATFORM-ASK-1"],
+      "technical_notes": "Security-critical: changes who can see which tenant (CLAUDE.md day-1 load-bearing invariant). Identity substrate = domain-scoped API keys (light), not human users. Generalizes ASK-1's X-Tenant-Id from service:ai to 'domain' scope, validated by shared non-NULL domain_id. ADR-0004 + spec authored 2026-05-31. Switch is auth-time only; data layer (MustTenantScope/Row Policy) untouched."
     }
   ]
 }
